@@ -327,9 +327,19 @@ function parseSheetData(raw){
     const hdrs=raw.Lots[0];
     const lotMap={};
     raw.Lots.slice(1).forEach(r=>{
-      const o={};hdrs.forEach((h,i)=>o[h]=r[i]!==undefined?String(r[i]).trim():r[i]);
+      const o={};
+      hdrs.forEach((h,i)=>{
+        const key=String(h||'').trim();
+        o[key]=r[i]!==undefined?String(r[i]).trim():'';
+      });
+      // Normalize Status — handle any capitalization
+      const statusKey=Object.keys(o).find(k=>k.toLowerCase()==='status');
+      if(statusKey&&statusKey!=='Status')o['Status']=o[statusKey];
+      // Normalize Internal Lot # 
+      const lotKey=Object.keys(o).find(k=>k.toLowerCase().includes('internal lot'));
+      if(lotKey&&lotKey!=='Internal Lot #')o['Internal Lot #']=o[lotKey];
       const key=o['Internal Lot #'];
-      if(key)lotMap[key]=o; // later rows overwrite earlier — keeps latest status
+      if(key&&key!=='undefined')lotMap[key]=o;
     });
     DB.lots=Object.values(lotMap);
   }
@@ -457,12 +467,12 @@ function renderDashboard(){
   const today=new Date().toDateString();
   const todayInsp=DB.entries.filter(e=>e.type==='inspection'&&new Date(e.timestamp).toDateString()===today);
   const todayDT=DB.entries.filter(e=>e.type==='downtime'&&new Date(e.timestamp).toDateString()===today);
-  const openLots=DB.lots.filter(l=>(l.Status||'').trim().startsWith('OPEN'));
-  const readyLots=DB.lots.filter(l=>(l.Status||'').trim().startsWith('OPEN')||l.Status==='CLOSED'||l.Status==='MANUALLY CLOSED').filter(l=>{
+  const openLots=DB.lots.filter(l=>(l.Status||l.status||'').trim().toUpperCase().startsWith('OPEN'));
+  const readyLots=DB.lots.filter(l=>(l.Status||l.status||'').trim().toUpperCase().startsWith('OPEN')||l.Status==='CLOSED'||l.Status==='MANUALLY CLOSED').filter(l=>{
     const g=parseInt(l.Good)||0;return g>=3000;
   });
   // Ready to ship = closed lots not yet shipped
-  const closedNotShipped=DB.lots.filter(l=>(l.Status||'').includes('CLOSED')&&!(l.Status||'').includes('SHIPPED'));
+  const closedNotShipped=DB.lots.filter(l=>(l.Status||l.status||'').toUpperCase().includes('CLOSED')&&!(l.Status||l.status||'').toUpperCase().includes('SHIPPED'));
   const banner=activeLot?
     `<div class="lot-banner"><div><div class="lot-num">${activeLot.lotNum}</div><div class="lot-meta">${activeLot.machine||''} | ${activeLot.partType||''}</div></div><span class="badge open-lot">ACTIVE</span></div>`:
     `<div class="no-lot-banner">⚠ No active lot — go to Lot Control to start or select a lot.</div>`;
@@ -493,6 +503,7 @@ function renderDashboard(){
       <div>DB.lots count: <strong style="color:var(--text)">${DB.lots.length}</strong></div>
       <div>Open lots: <strong style="color:var(--green)">${openLots.length}</strong></div>
       <div>Lot statuses: <strong style="color:var(--text)">${DB.lots.map(l=>l['Internal Lot #']+'='+l.Status).join(', ')||'none'}</strong></div>
+      <div>Lot keys (first lot): <strong style="color:var(--amber)">${DB.lots.length?Object.keys(DB.lots[0]).join(' | '):'none'}</strong></div>
       <div>DB.custLots: <strong style="color:var(--text)">${DB.custLots.length}</strong> — ${DB.custLots.map(c=>c.lotNum).join(', ')||'none'}</div>
       <button onclick="syncNow()" class="btn primary" style="margin-top:8px;width:auto;padding:6px 16px;font-size:12px">Force sync now</button>
     </div>
@@ -503,7 +514,7 @@ function renderDashboard(){
 
 // ==================== LOT CONTROL ====================
 function renderLots(){
-  const openLots=DB.lots.filter(l=>(l.Status||'').trim().startsWith('OPEN'));
+  const openLots=DB.lots.filter(l=>(l.Status||l.status||'').trim().toUpperCase().startsWith('OPEN'));
   const openCust=DB.custLots.filter(c=>c.status==='open');
   const closedCust=DB.custLots.filter(c=>c.status==='closed');
   const custOpts=openCust.map(c=>`<option value="${c.lotNum}">${c.lotNum} (${c.bins.length} bins)</option>`).join('');
@@ -749,7 +760,7 @@ async function closeCustLot(lotNum){
 
 // ==================== INSPECTION ====================
 function renderInspect(){
-  const openLots=DB.lots.filter(l=>(l.Status||'').trim().startsWith('OPEN'));
+  const openLots=DB.lots.filter(l=>(l.Status||l.status||'').trim().toUpperCase().startsWith('OPEN'));
   // Pre-select most recently started lot
   const defaultLot=openLots.length?openLots[openLots.length-1]['Internal Lot #']:'';
   const lotOpts=openLots.length
@@ -1045,7 +1056,7 @@ async function forceSyncInsp(){
 
 // ==================== DOWNTIME ====================
 function renderDowntime(){
-  const openLots=DB.lots.filter(l=>(l.Status||'').trim().startsWith('OPEN'));
+  const openLots=DB.lots.filter(l=>(l.Status||l.status||'').trim().toUpperCase().startsWith('OPEN'));
   const defaultLot=activeLot?activeLot.lotNum:(openLots.length?openLots[openLots.length-1]['Internal Lot #']:'');
   const lotOpts=openLots.length
     ?openLots.map(l=>`<option value="${l['Internal Lot #']}" ${l['Internal Lot #']===defaultLot?'selected':''}>${l['Internal Lot #']} | ${l.Machine||''}</option>`).join('')
@@ -1098,7 +1109,7 @@ async function forceSyncDT(){
 
 // ==================== RECEIVING / SHIPPING ====================
 function renderReceive(){
-  const openLots=DB.lots.filter(l=>(l.Status||'').trim().startsWith('OPEN'));
+  const openLots=DB.lots.filter(l=>(l.Status||l.status||'').trim().toUpperCase().startsWith('OPEN'));
   const openLotOpts=openLots.map(l=>`<option value="${l['Internal Lot #']}">${l['Internal Lot #']} | ${l.Machine} | ${l['Part Type']}</option>`).join('');
   return`
   <div class="page-title">Receiving & Shipping</div>
@@ -1262,8 +1273,8 @@ function runQ(){
 
 // ==================== CUSTOMER DASHBOARD ====================
 function renderCustDashboard(){
-  const closedNotShipped=DB.lots.filter(l=>(l.Status||'').includes('CLOSED')&&!(l.Status||'').includes('SHIPPED'));
-  const shippedLots=DB.lots.filter(l=>(l.Status||'').includes('SHIPPED'));
+  const closedNotShipped=DB.lots.filter(l=>(l.Status||l.status||'').toUpperCase().includes('CLOSED')&&!(l.Status||l.status||'').toUpperCase().includes('SHIPPED'));
+  const shippedLots=DB.lots.filter(l=>(l.Status||l.status||'').toUpperCase().includes('SHIPPED'));
   const today=new Date().toDateString();
   const todayInsp=DB.entries.filter(e=>e.type==='inspection'&&new Date(e.timestamp).toDateString()===today);
   const oosToday=todayInsp.filter(e=>e.oos).length;
