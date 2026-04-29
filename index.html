@@ -319,12 +319,16 @@ async function fetchAllData(){
   }
 }
 function parseSheetData(raw){
-  // Parse Lots
+  // Parse Lots — deduplicate by lot number, keeping the latest row per lot
   if(raw.Lots&&raw.Lots.length>1){
     const hdrs=raw.Lots[0];
-    DB.lots=raw.Lots.slice(1).map(r=>{
-      const o={};hdrs.forEach((h,i)=>o[h]=r[i]);return o;
+    const lotMap={};
+    raw.Lots.slice(1).forEach(r=>{
+      const o={};hdrs.forEach((h,i)=>o[h]=r[i]!==undefined?String(r[i]).trim():r[i]);
+      const key=o['Internal Lot #'];
+      if(key)lotMap[key]=o; // later rows overwrite earlier — keeps latest status
     });
+    DB.lots=Object.values(lotMap);
   }
   // Parse CustomerLots — build from ReceivingShipping first (primary source),
   // then supplement with CustomerLots tab if it exists
@@ -450,8 +454,8 @@ function renderDashboard(){
   const today=new Date().toDateString();
   const todayInsp=DB.entries.filter(e=>e.type==='inspection'&&new Date(e.timestamp).toDateString()===today);
   const todayDT=DB.entries.filter(e=>e.type==='downtime'&&new Date(e.timestamp).toDateString()===today);
-  const openLots=DB.lots.filter(l=>l.Status==='OPEN'||l.Status==='OPEN-UPDATED');
-  const readyLots=DB.lots.filter(l=>l.Status==='OPEN'||l.Status==='OPEN-UPDATED'||l.Status==='CLOSED'||l.Status==='MANUALLY CLOSED').filter(l=>{
+  const openLots=DB.lots.filter(l=>(l.Status||'').trim().startsWith('OPEN'));
+  const readyLots=DB.lots.filter(l=>(l.Status||'').trim().startsWith('OPEN')||l.Status==='CLOSED'||l.Status==='MANUALLY CLOSED').filter(l=>{
     const g=parseInt(l.Good)||0;return g>=3000;
   });
   // Ready to ship = closed lots not yet shipped
@@ -486,7 +490,7 @@ function renderDashboard(){
 
 // ==================== LOT CONTROL ====================
 function renderLots(){
-  const openLots=DB.lots.filter(l=>l.Status==='OPEN'||l.Status==='OPEN-UPDATED');
+  const openLots=DB.lots.filter(l=>(l.Status||'').trim().startsWith('OPEN'));
   const openCust=DB.custLots.filter(c=>c.status==='open');
   const closedCust=DB.custLots.filter(c=>c.status==='closed');
   const custOpts=openCust.map(c=>`<option value="${c.lotNum}">${c.lotNum} (${c.bins.length} bins)</option>`).join('');
@@ -732,7 +736,7 @@ async function closeCustLot(lotNum){
 
 // ==================== INSPECTION ====================
 function renderInspect(){
-  const openLots=DB.lots.filter(l=>l.Status==='OPEN'||l.Status==='OPEN-UPDATED');
+  const openLots=DB.lots.filter(l=>(l.Status||'').trim().startsWith('OPEN'));
   // Pre-select most recently started lot
   const defaultLot=openLots.length?openLots[openLots.length-1]['Internal Lot #']:'';
   const lotOpts=openLots.length
@@ -1028,7 +1032,7 @@ async function forceSyncInsp(){
 
 // ==================== DOWNTIME ====================
 function renderDowntime(){
-  const openLots=DB.lots.filter(l=>l.Status==='OPEN'||l.Status==='OPEN-UPDATED');
+  const openLots=DB.lots.filter(l=>(l.Status||'').trim().startsWith('OPEN'));
   const defaultLot=activeLot?activeLot.lotNum:(openLots.length?openLots[openLots.length-1]['Internal Lot #']:'');
   const lotOpts=openLots.length
     ?openLots.map(l=>`<option value="${l['Internal Lot #']}" ${l['Internal Lot #']===defaultLot?'selected':''}>${l['Internal Lot #']} | ${l.Machine||''}</option>`).join('')
@@ -1081,7 +1085,7 @@ async function forceSyncDT(){
 
 // ==================== RECEIVING / SHIPPING ====================
 function renderReceive(){
-  const openLots=DB.lots.filter(l=>l.Status==='OPEN'||l.Status==='OPEN-UPDATED');
+  const openLots=DB.lots.filter(l=>(l.Status||'').trim().startsWith('OPEN'));
   const openLotOpts=openLots.map(l=>`<option value="${l['Internal Lot #']}">${l['Internal Lot #']} | ${l.Machine} | ${l['Part Type']}</option>`).join('');
   return`
   <div class="page-title">Receiving & Shipping</div>
