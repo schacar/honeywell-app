@@ -309,12 +309,15 @@ async function fetchAllData(){
   try{
     const r=await fetch(WEB_APP+'?t='+Date.now());
     const raw=await r.json();
+    // Debug: log what sheets came back and how many rows
+    console.log('Sheet data received:',Object.keys(raw).map(k=>k+':'+((raw[k]||[]).length)+' rows').join(', '));
+    console.log('Lots raw:',JSON.stringify((raw.Lots||[]).slice(0,3)));
     parseSheetData(raw);
     setSyncStatus('ok');
     renderPage(currentPage);
   }catch(e){
+    console.error('Sync error:',e);
     setSyncStatus('error');
-    // Fall back to localStorage cache
     loadLocalCache();
   }
 }
@@ -483,6 +486,16 @@ function renderDashboard(){
     <div class="metric oos"><div class="val">${todayInsp.filter(e=>e.oos).length}</div><div class="lbl">Out of spec</div></div>
     <div class="metric green"><div class="val">${openLots.length}</div><div class="lbl">Open lots</div></div>
     <div class="metric blue"><div class="val">${closedNotShipped.length}</div><div class="lbl">Ready to ship</div></div>
+  </div>
+  <div class="card" style="border-color:var(--blue-border);background:var(--blue-bg)">
+    <div class="card-title" style="color:var(--blue)">Sync debug — remove when working</div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--text2);line-height:1.8">
+      <div>DB.lots count: <strong style="color:var(--text)">${DB.lots.length}</strong></div>
+      <div>Open lots: <strong style="color:var(--green)">${openLots.length}</strong></div>
+      <div>Lot statuses: <strong style="color:var(--text)">${DB.lots.map(l=>l['Internal Lot #']+'='+l.Status).join(', ')||'none'}</strong></div>
+      <div>DB.custLots: <strong style="color:var(--text)">${DB.custLots.length}</strong> — ${DB.custLots.map(c=>c.lotNum).join(', ')||'none'}</div>
+      <button onclick="syncNow()" class="btn primary" style="margin-top:8px;width:auto;padding:6px 16px;font-size:12px">Force sync now</button>
+    </div>
   </div>
   <div class="card"><div class="card-title">Ready to Ship — Closed Lots</div>${readyHTML}</div>
   <div class="card"><div class="card-title">Recent Activity</div>${recentHTML}</div>`;
