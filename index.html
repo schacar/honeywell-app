@@ -145,7 +145,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .na-toggle{font-size:11px;padding:4px 12px;border-radius:20px;border:1px dashed var(--border2);background:transparent;color:var(--text3);cursor:pointer;font-family:var(--mono);float:right;margin-top:-2px}
 .na-toggle:hover{border-color:var(--amber);color:var(--amber)}
 .na-toggle.active{background:var(--amber-bg);color:var(--amber);border-color:#78350f;border-style:solid}
-/* Ready to ship table */
+/* Listos para envío / Ready to ship table */
 .ship-table{width:100%;border-collapse:collapse;font-size:13px}
 .ship-table th{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left}
 .ship-table td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text2)}
@@ -205,7 +205,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
     <div class="header-right">
       <span class="sync-pill" id="sync-pill" onclick="syncNow()">● Syncing...</span>
       <span class="role-badge" id="role-badge">OPERATOR</span>
-      <button class="logout-btn" onclick="logout()">Log out</button>
+      <button class="logout-btn" onclick="logout()">Cerrar sesión / Log out</button>
     </div>
   </div>
   <div class="nav" id="main-nav"></div>
@@ -232,6 +232,7 @@ let lastInspRow=null;
 let lastDTRow=null;
 let qResults=[];
 let editingLotNum=null;
+let lastShipPO='';
 let syncTimer=null;
 let currentPage='dashboard';
 
@@ -281,17 +282,17 @@ function buildNav(){
   const nav=document.getElementById('main-nav');
   if(currentRole==='operator'){
     nav.innerHTML=`
-      <button class="active" onclick="showPage('dashboard',this)">Dashboard</button>
+      <button class="active" onclick="showPage('dashboard',this)">Panel / Dashboard</button>
       <button onclick="showPage('receive',this)">Receiving / Shipping</button>
-      <button onclick="showPage('lots',this)">Lot Control</button>
-      <button onclick="showPage('inspect',this)">Inspection</button>
-      <button onclick="showPage('downtime',this)">Downtime</button>
+      <button onclick="showPage('lots',this)">Control de Lotes / Lot Control</button>
+      <button onclick="showPage('inspect',this)">Inspección / Inspection</button>
+      <button onclick="showPage('downtime',this)">Tiempo Muerto / Downtime</button>
       <button onclick="showPage('debug',this)" style="color:var(--amber)">Debug</button>
-      <button onclick="showPage('query',this)">Query & Export</button>`;
+      <button onclick="showPage('query',this)">Consultas y Exportar / Query & Export</button>`;
   }else{
     nav.innerHTML=`
-      <button class="active" onclick="showPage('cust-dashboard',this)">Dashboard</button>
-      <button onclick="showPage('cust-query',this)">Query & Reports</button>`;
+      <button class="active" onclick="showPage('cust-dashboard',this)">Panel / Dashboard</button>
+      <button onclick="showPage('cust-query',this)">Consultas e Informes / Query & Reports</button>`;
   }
 }
 function showPage(p,btn){
@@ -304,9 +305,9 @@ function showPage(p,btn){
 // ==================== SYNC ====================
 function setSyncStatus(status){
   const pill=document.getElementById('sync-pill');
-  if(status==='ok'){pill.textContent='● Live';pill.className='sync-pill';}
-  else if(status==='syncing'){pill.textContent='↻ Syncing...';pill.className='sync-pill syncing';}
-  else{pill.textContent='⚠ Offline';pill.className='sync-pill error';}
+  if(status==='ok'){pill.textContent='● En vivo / Live';pill.className='sync-pill';}
+  else if(status==='syncing'){pill.textContent='↻ Sincronizando / Syncing...';pill.className='sync-pill syncing';}
+  else{pill.textContent='⚠ Sin conexión / Offline';pill.className='sync-pill error';}
 }
 async function fetchAllData(){
   setSyncStatus('syncing');
@@ -427,6 +428,7 @@ function saveLocalCache(){
     localStorage.setItem('hw-db-cache',JSON.stringify(DB));
     if(activeLot)localStorage.setItem('hw-activelot',JSON.stringify(activeLot));
     localStorage.setItem('hw-shellac-na',JSON.stringify(shellacNA));
+    if(lastShipPO)localStorage.setItem('hw-last-po',lastShipPO);
   }catch(e){}
 }
 function loadLocalCache(){
@@ -434,6 +436,7 @@ function loadLocalCache(){
     const d=localStorage.getItem('hw-db-cache');if(d)DB=JSON.parse(d);
     if(!activeLot){const a=localStorage.getItem('hw-activelot');if(a&&a!=='null')activeLot=JSON.parse(a);}
     const sna=localStorage.getItem('hw-shellac-na');if(sna)shellacNA=JSON.parse(sna);
+    const po=localStorage.getItem('hw-last-po');if(po)lastShipPO=po;
   }catch(e){}
 }
 async function toSheet(sheet,headers,row){
@@ -471,50 +474,32 @@ function renderPage(p){
 function renderDashboard(){
   const today=new Date().toDateString();
   const todayInsp=DB.entries.filter(e=>e.type==='inspection'&&new Date(e.timestamp).toDateString()===today);
-  const todayDT=DB.entries.filter(e=>e.type==='downtime'&&new Date(e.timestamp).toDateString()===today);
   const openLots=DB.lots.filter(l=>(l.Status||l.status||'').trim().toUpperCase().startsWith('OPEN'));
-  const readyLots=DB.lots.filter(l=>(l.Status||l.status||'').trim().toUpperCase().startsWith('OPEN')||l.Status==='CLOSED'||l.Status==='MANUALLY CLOSED').filter(l=>{
-    const g=parseInt(l.Good)||0;return g>=3000;
-  });
-  // Ready to ship = closed lots not yet shipped
   const closedNotShipped=DB.lots.filter(l=>(l.Status||l.status||'').toUpperCase().includes('CLOSED')&&!(l.Status||l.status||'').toUpperCase().includes('SHIPPED'));
   const banner=activeLot?
-    `<div class="lot-banner"><div><div class="lot-num">${activeLot.lotNum}</div><div class="lot-meta">${activeLot.machine||''} | ${activeLot.partType||''}</div></div><span class="badge open-lot">ACTIVE</span></div>`:
-    `<div class="no-lot-banner">⚠ No active lot — go to Lot Control to start or select a lot.</div>`;
+    `<div class="lot-banner"><div><div class="lot-num">${activeLot.lotNum}</div><div class="lot-meta">Lote activo / Active lot — ${activeLot.machine||''} | ${activeLot.partType||''}</div></div><span class="badge open-lot">ACTIVO / ACTIVE</span></div>`:
+    `<div class="no-lot-banner">⚠ Sin lote activo / No active lot — vaya a / go to Lot Control para iniciar / to start a lot.</div>`;
   const recent=DB.entries.slice(-8).reverse();
   const recentHTML=recent.length?recent.map(e=>{
     const ts=new Date(e.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-    const lbl=e.type==='inspection'?'Inspection':e.type==='lot'?'Lot Started':'Downtime';
+    const lbl=e.type==='inspection'?'Inspección / Inspection':e.type==='lot'?'Lote iniciado / Lot Started':'Tiempo muerto / Downtime';
     const bc=e.type==='downtime'?'dt':e.oos?'oos':'ok';
     return`<div class="log-row"><span>${ts} — ${lbl} <span class="log-lot">${e.lotNum||''}</span></span><span class="badge ${bc}">${e.type==='downtime'?'DT':e.oos?'OOS':'OK'}</span></div>`;
-  }).join(''):'<p style="color:var(--text3);font-size:13px">No entries yet today.</p>';
-
-  const readyHTML=closedNotShipped.length?`<table class="ship-table"><thead><tr><th>Lot #</th><th>Machine</th><th>Type</th><th>Good Parts</th><th>Scrap</th><th>Customer Lots</th></tr></thead><tbody>`+
+  }).join(''):'<p style="color:var(--text3);font-size:13px">Sin entradas hoy / No entries yet today.</p>';
+  const readyHTML=closedNotShipped.length?`<table class="ship-table"><thead><tr><th>Lote # / Lot #</th><th>Máquina / Machine</th><th>Tipo / Type</th><th>Piezas buenas / Good Parts</th><th>Scrap</th><th>Lotes cliente / Customer Lots</th></tr></thead><tbody>`+
     closedNotShipped.map(l=>`<tr><td>${l['Internal Lot #']||''}</td><td>${l.Machine||''}</td><td>${l['Part Type']||''}</td><td style="color:var(--green);font-weight:600">${l.Good||0}</td><td>${l.Scrap||0}</td><td style="font-size:11px">${l['Customer Lots']||'—'}</td></tr>`).join('')+
-    `</tbody></table>`:'<p style="font-size:13px;color:var(--text3)">No lots ready to ship yet.</p>';
-
+    `</tbody></table>`:'<p style="font-size:13px;color:var(--text3)">Sin lotes listos para envío / No lots ready to ship yet.</p>';
   return`
   <div class="iso-bar"><span>AUTOMATION SYSTEMS — HONEYWELL PRODUCTION QUALITY SYSTEM</span><span>${new Date().toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})}</span></div>
   ${banner}
   <div class="metrics">
-    <div class="metric"><div class="val">${todayInsp.length}</div><div class="lbl">Inspections today</div></div>
-    <div class="metric oos"><div class="val">${todayInsp.filter(e=>e.oos).length}</div><div class="lbl">Out of spec</div></div>
-    <div class="metric green"><div class="val">${openLots.length}</div><div class="lbl">Open lots</div></div>
-    <div class="metric blue"><div class="val">${closedNotShipped.length}</div><div class="lbl">Ready to ship</div></div>
+    <div class="metric"><div class="val">${todayInsp.length}</div><div class="lbl">Inspecciones hoy / Inspecciones hoy / Inspections today</div></div>
+    <div class="metric oos"><div class="val">${todayInsp.filter(e=>e.oos).length}</div><div class="lbl">Fuera de spec / Out of spec</div></div>
+    <div class="metric green"><div class="val">${openLots.length}</div><div class="lbl">Lotes abiertos / Open lots</div></div>
+    <div class="metric blue"><div class="val">${closedNotShipped.length}</div><div class="lbl">Listos enviar / Listos para envío / Ready to ship</div></div>
   </div>
-  <div class="card" style="border-color:var(--blue-border);background:var(--blue-bg)">
-    <div class="card-title" style="color:var(--blue)">Sync debug — remove when working</div>
-    <div style="font-family:var(--mono);font-size:11px;color:var(--text2);line-height:1.8">
-      <div>DB.lots count: <strong style="color:var(--text)">${DB.lots.length}</strong></div>
-      <div>Open lots: <strong style="color:var(--green)">${openLots.length}</strong></div>
-      <div>Lot statuses: <strong style="color:var(--text)">${DB.lots.map(l=>l['Internal Lot #']+'='+l.Status).join(', ')||'none'}</strong></div>
-      <div>Lot keys (first lot): <strong style="color:var(--amber)">${DB.lots.length?Object.keys(DB.lots[0]).join(' | '):'none'}</strong></div>
-      <div>DB.custLots: <strong style="color:var(--text)">${DB.custLots.length}</strong> — ${DB.custLots.map(c=>c.lotNum).join(', ')||'none'}</div>
-      <button onclick="syncNow()" class="btn primary" style="margin-top:8px;width:auto;padding:6px 16px;font-size:12px">Force sync now</button>
-    </div>
-  </div>
-  <div class="card"><div class="card-title">Ready to Ship — Closed Lots</div>${readyHTML}</div>
-  <div class="card"><div class="card-title">Recent Activity</div>${recentHTML}</div>`;
+  <div class="card"><div class="card-title">Listos para envío / Ready to Ship — Lotes cerrados / Closed Lots</div>${readyHTML}</div>
+  <div class="card"><div class="card-title">Actividad reciente / Recent Activity</div>${recentHTML}</div>`;
 }
 
 // ==================== LOT CONTROL ====================
@@ -526,92 +511,96 @@ function renderLots(){
   const openLotOpts=openLots.map(l=>`<option value="${l['Internal Lot #']}">${l['Internal Lot #']} | ${l.Machine} | ${l['Part Type']}</option>`).join('');
 
   return`
-  <div class="page-title">Lot Control</div>
-  <div class="page-sub">Manage internal lots and customer lot inventory</div>
+  <div class="page-title">Control de Lotes / Lot Control</div>
+  <div class="page-sub">Administre lotes internos e inventario de lotes de cliente / Manage internal lots and customer lot inventory</div>
   <div class="subtabs">
-    <button class="active" onclick="setLT('new',this)">New Lot</button>
-    <button onclick="setLT('edit',this)">Edit Open Lot</button>
-    <button onclick="setLT('custlots',this)">Customer Lots</button>
+    <button class="active" onclick="setLT('new',this)">Nuevo Lote / New Lot</button>
+    <button onclick="setLT('edit',this)">Editar Lote / Edit Open Lot</button>
+    <button onclick="setLT('custlots',this)">Lotes Cliente / Customer Lots</button>
   </div>
 
   <!-- NEW LOT -->
   <div id="lt-new">
     <div class="card">
-      <div class="card-title">Lot Setup</div>
+      <div class="card-title">Configuración de lote / Lot Setup</div>
       <div class="g2">
-        <div class="field"><label>Machine #</label>
+        <div class="field"><label>Máquina # / Machine #</label>
           <select id="nl-mach" onchange="genLot()">
             <option value="01">S&F #1</option><option value="02">S&F #2</option>
             <option value="03" selected>S&F #3</option><option value="04">S&F #4</option><option value="05">S&F #5</option>
           </select>
         </div>
-        <div class="field"><label>Date</label><input type="date" id="nl-date" onchange="genLot()"></div>
+        <div class="field"><label>Fecha / Date</label><input type="date" id="nl-date" onchange="genLot()"></div>
       </div>
       <div class="lot-display" id="nl-lot">--</div>
-      <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:12px;font-family:var(--mono)">Machine — YYMMDD — Bin sequence</div>
-      <div class="field"><label>Part Type</label>
-        <select id="nl-ptype"><option value="both">Both Hollow & Solid</option><option value="hollow">Hollow only</option><option value="solid">Solid only</option></select>
+      <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:12px;font-family:var(--mono)">Máquina / Machine — YYMMDD — Secuencia de caja / Bin sequence</div>
+      <div class="field"><label>Tipo de parte / Part Type</label>
+        <select id="nl-ptype">
+          <option value="both">Ambos / Both Hollow & Solid</option>
+          <option value="hollow">Solo hueco / Hollow only</option>
+          <option value="solid">Solo sólido / Solid only</option>
+        </select>
       </div>
-      <div class="field"><label>Operator Initials</label>
-        <input id="nl-op" maxlength="6" placeholder="e.g. MRC" style="text-transform:uppercase;font-size:18px;text-align:center;font-family:var(--mono)">
+      <div class="field"><label>Iniciales del operador / Operator Initials</label>
+        <input id="nl-op" maxlength="6" placeholder="Ej: MRC" style="text-transform:uppercase;font-size:18px;text-align:center;font-family:var(--mono)">
       </div>
     </div>
     <div class="card">
-      <div class="card-title">Customer Cup Lots — Select from Received Lots</div>
-      <p style="font-size:12px;color:var(--text3);margin-bottom:12px">${openCust.length===0?'<span style="color:var(--amber)">⚠ No received customer lots available. Log incoming material in Receiving / Shipping first.</span>':'Only received open customer lots shown.'}</p>
+      <div class="card-title">Lotes de copa del cliente / Customer Cup Lots — Solo lotes recibidos / Select from Received Lots</div>
+      <p style="font-size:12px;color:var(--text3);margin-bottom:12px">${openCust.length===0?'<span style="color:var(--amber)">⚠ Sin lotes recibidos disponibles / No received customer lots available. Registre en Recepción / Log in Receiving first.</span>':'Solo se muestran lotes recibidos abiertos / Only received open customer lots shown.'}</p>
       <div id="nl-cl-container"></div>
-      <button class="add-btn" onclick="addNLCustLot()">+ Add customer lot / bin</button>
+      <button class="add-btn" onclick="addNLCustLot()">+ Agregar lote cliente / Add customer lot / bin</button>
     </div>
     <div class="card">
-      <div class="card-title">Part Counts (update later in Edit if needed)</div>
+      <div class="card-title">Conteo de piezas / Part Counts (actualice después si necesario / update later if needed)</div>
       <div class="g3">
-        <div class="field"><label>Good Parts</label><input id="nl-good" type="number" min="0" placeholder="0"></div>
-        <div class="field"><label>Bad Parts</label><input id="nl-bad" type="number" min="0" placeholder="0"></div>
-        <div class="field"><label>Scrap</label><input id="nl-scrap" type="number" min="0" placeholder="0"></div>
+        <div class="field"><label>Piezas buenas / Good Parts</label><input id="nl-good" type="number" min="0" placeholder="0"></div>
+        <div class="field"><label>Piezas malas / Bad Parts</label><input id="nl-bad" type="number" min="0" placeholder="0"></div>
+        <div class="field"><label>Scrap / Desperdicio</label><input id="nl-scrap" type="number" min="0" placeholder="0"></div>
       </div>
     </div>
-    <button class="btn success" id="btn-startlot" onclick="startLot()">Iniciar / Start Lot</button>
+    <button class="btn success" id="btn-startlot" onclick="startLot()">Iniciar lote / Start Lot — Comenzar producción / Begin Production</button>
     <div id="nl-msg" class="msg"></div>
   </div>
 
   <!-- EDIT LOT -->
   <div id="lt-edit" style="display:none">
     <div class="card">
-      <div class="card-title">Select Open Lot to Edit</div>
-      <div class="field"><label>Open Internal Lots</label>
-        <select id="el-picker" onchange="loadEditLot()" style="font-family:var(--mono);font-size:14px;padding:10px">
-          <option value="">— Select a lot —</option>${openLotOpts}
+      <div class="card-title">Seleccione lote abierto para editar / Select Open Lot to Edit</div>
+      <div class="field"><label>Lotes abiertos / Open Internal Lots</label>
+        <select id="el-picker" onchange="loadEditLot()" style="font-family:var(--mono);font-size:14px;padding:10px;background:#e8ecf0;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;width:100%">
+          <option value="">— Seleccione un lote / Select a lot —</option>${openLotOpts}
         </select>
       </div>
     </div>
     <div id="el-form" style="display:none">
       <div class="card">
         <div class="g2">
-          <div><div class="section-label">Lot Number</div><div style="font-family:var(--mono);font-size:20px;font-weight:600;color:var(--green);margin-top:4px" id="el-lotnum"></div></div>
-          <div><div class="section-label">Machine / Type</div><div style="font-size:14px;color:var(--text2);margin-top:4px" id="el-machine"></div></div>
+          <div><div class="section-label">Número de lote / Lot Number</div><div style="font-family:var(--mono);font-size:20px;font-weight:600;color:var(--green);margin-top:4px" id="el-lotnum"></div></div>
+          <div><div class="section-label">Máquina / Tipo — Machine / Type</div><div style="font-size:14px;color:var(--text2);margin-top:4px" id="el-machine"></div></div>
         </div>
         <div class="divider"></div>
-        <div class="section-label">Set as Active Lot</div>
-        <button class="btn success" onclick="setActiveLot()" id="el-active-btn">Set as Active Lot</button>
+        <div class="section-label">Establecer como lote activo / Set as Active Lot</div>
+        <button class="btn success" onclick="setActiveLot()" id="el-active-btn">Activar lote / Set as Active Lot</button>
       </div>
       <div class="card">
-        <div class="card-title">Add Customer Lot / Bin</div>
+        <div class="card-title">Agregar lote de cliente / Add Customer Lot / Bin</div>
         <div id="el-cl-container"></div>
-        <button class="add-btn" onclick="addELCustLot()">+ Add customer lot / bin</button>
+        <button class="add-btn" onclick="addELCustLot()">+ Agregar lote cliente / Add customer lot / bin</button>
         <div class="divider"></div>
-        <div class="section-label">Currently Assigned</div>
+        <div class="section-label">Lotes cliente asignados / Currently Assigned Customer Lots</div>
         <div id="el-cl-current" style="font-size:13px;color:var(--text2);font-family:var(--mono)"></div>
       </div>
       <div class="card">
-        <div class="card-title">Update Part Counts</div>
+        <div class="card-title">Actualizar conteo de piezas / Update Part Counts</div>
         <div class="g3">
-          <div class="field"><label>Good Parts</label><input id="el-good" type="number" min="0" placeholder="0"></div>
-          <div class="field"><label>Bad Parts</label><input id="el-bad" type="number" min="0" placeholder="0"></div>
-          <div class="field"><label>Scrap</label><input id="el-scrap" type="number" min="0" placeholder="0"></div>
+          <div class="field"><label>Piezas buenas / Good Parts</label><input id="el-good" type="number" min="0" placeholder="0"></div>
+          <div class="field"><label>Piezas malas / Bad Parts</label><input id="el-bad" type="number" min="0" placeholder="0"></div>
+          <div class="field"><label>Scrap / Desperdicio</label><input id="el-scrap" type="number" min="0" placeholder="0"></div>
         </div>
       </div>
-      <button class="btn primary" onclick="saveEditLot()">Save Changes</button>
-      <button class="btn amber" onclick="manualCloseLot()" style="margin-top:6px">Close Lot Without Shipping</button>
+      <button class="btn primary" onclick="saveEditLot()">Guardar cambios / Save Changes</button>
+      <button class="btn amber" onclick="manualCloseLot()" style="margin-top:6px">Cerrar sin envío / Close Lot Without Shipping</button>
       <div id="el-msg" class="msg"></div>
     </div>
   </div>
@@ -619,13 +608,13 @@ function renderLots(){
   <!-- CUSTOMER LOTS -->
   <div id="lt-custlots" style="display:none">
     <div class="card">
-      <div class="card-title">Open Customer Lots</div>
-      <p style="font-size:12px;color:var(--text3);margin-bottom:12px">Click "Mark Empty" when you physically run out of parts from that customer lot.</p>
-      ${openCust.length?openCust.map(c=>`<div class="lot-item"><div><div class="li-num">${c.lotNum}</div><div class="li-meta">Received: ${c.receivedDate||'—'} | Bins: ${c.bins.join(', ')||'none'}</div></div><button class="btn danger sm" onclick="closeCustLot('${c.lotNum}')">Mark Empty</button></div>`).join(''):'<p style="font-size:13px;color:var(--text3)">No open customer lots.</p>'}
+      <div class="card-title">Lotes de cliente abiertos / Open Customer Lots</div>
+      <p style="font-size:12px;color:var(--text3);margin-bottom:12px">Haga clic en "Marcar vacío" cuando se agoten físicamente las piezas de ese lote / Click "Mark Empty" when you physically run out of parts from that customer lot.</p>
+      ${openCust.length?openCust.map(c=>`<div class="lot-item"><div><div class="li-num">${c.lotNum}</div><div class="li-meta">Recibido / Received: ${c.receivedDate||'—'} | Cajas / Bins: ${c.bins.join(', ')||'ninguna / none'}</div></div><button class="btn danger sm" onclick="closeCustLot('${c.lotNum}')">Marcar vacío / Mark Empty</button></div>`).join(''):'<p style="font-size:13px;color:var(--text3)">Sin lotes de cliente abiertos / No open customer lots.</p>'}
     </div>
     <div class="card">
-      <div class="card-title">Closed / Empty Customer Lots</div>
-      ${closedCust.length?closedCust.map(c=>`<div class="lot-item locked"><div><div class="li-num">${c.lotNum}</div><div class="li-meta">Closed: ${c.closedDate||'—'}</div></div><span class="badge locked">EMPTY</span></div>`).join(''):'<p style="font-size:13px;color:var(--text3)">No closed customer lots yet.</p>'}
+      <div class="card-title">Lotes cerrados / vacíos — Closed / Empty Customer Lots</div>
+      ${closedCust.length?closedCust.map(c=>`<div class="lot-item locked"><div><div class="li-num">${c.lotNum}</div><div class="li-meta">Cerrado / Closed: ${c.closedDate||'—'}</div></div><span class="badge locked">VACÍO / EMPTY</span></div>`).join(''):'<p style="font-size:13px;color:var(--text3)">Sin lotes cerrados todavía / No closed customer lots yet.</p>'}
     </div>
   </div>`;
 }
@@ -663,14 +652,14 @@ function addNLCustLot(){
   nlClCount++;
   const c=document.getElementById('nl-cl-container');if(!c)return;
   const d=document.createElement('div');d.className='g2';d.style.marginBottom='10px';
-  d.innerHTML=`<div class="field" style="margin:0"><label>Customer Lot</label><select id="nl-cl-${nlClCount}" style="font-family:var(--mono)"><option value="">— Select —</option>${getCustOpts()}</select></div><div class="field" style="margin:0"><label>Bin #</label><input id="nl-bin-${nlClCount}" placeholder="e.g. 23" style="font-size:16px;padding:10px;font-family:var(--mono);text-align:center;width:100%;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:7px"></div>`;
+  d.innerHTML=`<div class="field" style="margin:0"><label>Lote cliente / Customer Lot</label><select id="nl-cl-${nlClCount}" style="font-family:var(--mono);background:#e8ecf0;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;width:100%;padding:8px"><option value="">— Seleccione / Select —</option>${getCustOpts()}</select></div><div class="field" style="margin:0"><label>Caja # / Bin #</label><input id="nl-bin-${nlClCount}" placeholder="ej. 23" style="font-size:16px;padding:10px;font-family:var(--mono);text-align:center;width:100%;background:#fff;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px"></div>`;
   c.appendChild(d);
 }
 async function startLot(){
   const lotNum=document.getElementById('nl-lot')?.textContent.trim();
   const op=document.getElementById('nl-op')?.value.trim().toUpperCase();
-  if(!lotNum||lotNum==='--'){showMsg('nl-msg','Select a date first','err');return;}
-  if(!op){showMsg('nl-msg','Enter operator initials','err');return;}
+  if(!lotNum||lotNum==='--'){showMsg('nl-msg','Seleccione una fecha / Select a date first','err');return;}
+  if(!op){showMsg('nl-msg','Ingrese iniciales / Enter operator initials','err');return;}
   const cls=[];
   for(let i=1;i<=nlClCount;i++){
     const s=document.getElementById('nl-cl-'+i);const b=document.getElementById('nl-bin-'+i);
@@ -713,7 +702,7 @@ function addELCustLot(){
   elClCount++;
   const c=document.getElementById('el-cl-container');if(!c)return;
   const d=document.createElement('div');d.className='g2';d.style.marginBottom='10px';
-  d.innerHTML=`<div class="field" style="margin:0"><label>Customer Lot</label><select id="el-cl-${elClCount}" style="font-family:var(--mono)"><option value="">— Select —</option>${getCustOpts()}</select></div><div class="field" style="margin:0"><label>Bin #</label><input id="el-bin-${elClCount}" placeholder="e.g. 23" style="font-size:16px;padding:10px;font-family:var(--mono);text-align:center;width:100%;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:7px"></div>`;
+  d.innerHTML=`<div class="field" style="margin:0"><label>Lote cliente / Customer Lot</label><select id="el-cl-${elClCount}" style="font-family:var(--mono);background:#e8ecf0;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;width:100%;padding:8px"><option value="">— Seleccione / Select —</option>${getCustOpts()}</select></div><div class="field" style="margin:0"><label>Caja # / Bin #</label><input id="el-bin-${elClCount}" placeholder="ej. 23" style="font-size:16px;padding:10px;font-family:var(--mono);text-align:center;width:100%;background:#fff;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px"></div>`;
   c.appendChild(d);
 }
 function setActiveLot(){
@@ -770,7 +759,7 @@ function renderInspect(){
   const defaultLot=openLots.length?openLots[openLots.length-1]['Internal Lot #']:'';
   const lotOpts=openLots.length
     ?openLots.map(l=>`<option value="${l['Internal Lot #']}" ${l['Internal Lot #']===defaultLot?'selected':''}>${l['Internal Lot #']} | ${l.Machine||''} | ${l['Part Type']||''}</option>`).join('')
-    :'<option value="">No open lots — go to Lot Control first</option>';
+    :'<option value="">Sin lotes abiertos / No open lots — vaya a Control de Lotes / go to Lot Control first</option>';
   return`
   <div class="page-title">Inspección / 30-Min Inspection</div>
   <div class="page-sub">Seleccione el lote que está revisando / Select the lot you are currently checking</div>
@@ -812,22 +801,22 @@ function renderInspect(){
       <button class="btn sm" style="background:var(--bg3);color:var(--text2);border-color:var(--border2)" onclick="clearNA('hollow')">Undo</button>
     </div>
     <div id="hollow-content">
-      <div style="text-align:right;margin-bottom:8px"><button class="na-toggle" id="na-btn-sh-hollow" onclick="markShellacNA('hollow')">Shellac not running on hollow — mark N/A</button></div>
-      <div class="card"><div class="card-title">Dim 1 — Groove Depth 002770A</div><div class="spec-label">USL: 0.103 | LSL: 0.091</div><div class="g4"><input class="dim-input" id="h1a" placeholder="1A" oninput="chk('h1','hollow')"><input class="dim-input" id="h1b" placeholder="1B" oninput="chk('h1','hollow')"><input class="dim-input" id="h1c" placeholder="1C" oninput="chk('h1','hollow')"><input class="dim-input" id="h1d" placeholder="1D" oninput="chk('h1','hollow')"></div><div class="avg-bar" id="h1avg">Average —</div></div>
-      <div class="card"><div class="card-title">Dim 2 — Leg Height Small OD</div><div class="spec-label">USL: 0.115 | LSL: 0.075</div><div class="g4"><input class="dim-input" id="h2a" placeholder="2A" oninput="chk('h2','hollow')"><input class="dim-input" id="h2b" placeholder="2B" oninput="chk('h2','hollow')"><input class="dim-input" id="h2c" placeholder="2C" oninput="chk('h2','hollow')"><input class="dim-input" id="h2d" placeholder="2D" oninput="chk('h2','hollow')"></div><div class="avg-bar" id="h2avg">Average —</div></div>
-      <div class="card"><div class="card-title">Dim 3 — Leg Height Large OD</div><div class="spec-label">USL: 0.160 | LSL: 0.120</div><div class="g4"><input class="dim-input" id="h3a" placeholder="3A" oninput="chk('h3','hollow')"><input class="dim-input" id="h3b" placeholder="3B" oninput="chk('h3','hollow')"><input class="dim-input" id="h3c" placeholder="3C" oninput="chk('h3','hollow')"><input class="dim-input" id="h3d" placeholder="3D" oninput="chk('h3','hollow')"></div><div class="avg-bar" id="h3avg">Average —</div></div>
-      <div class="card"><div class="card-title">Pass / Fail — Hollow Gages</div>
-        <div class="field"><label>Dim 4 — ID Gage 005458B</label><div class="pf-row"><button class="pfb" id="h4p" onclick="pf(this,'h4','P')">PASS</button><button class="pfb" id="h4f" onclick="pf(this,'h4','F')">FAIL</button></div></div>
-        <div class="field"><label>Dim 5 — OD Gage 000340A</label><div class="pf-row"><button class="pfb" id="h5p" onclick="pf(this,'h5','P')">PASS</button><button class="pfb" id="h5f" onclick="pf(this,'h5','F')">FAIL</button></div></div>
-        <div class="field"><label>Dim 6 — Roll Offs / Visual</label><div class="pf-row"><button class="pfb" id="h6p" onclick="pf(this,'h6','P')">PASS</button><button class="pfb" id="h6f" onclick="pf(this,'h6','F')">FAIL</button></div></div>
+      <div style="text-align:right;margin-bottom:8px"><button class="na-toggle" id="na-btn-sh-hollow" onclick="markShellacNA('hollow')">Sin shellac en hueco / Shellac not running on hollow — marcar N/A</button></div>
+      <div class="card"><div class="card-title">Dim 1 — Profundidad ranura / Groove Depth 002770A</div><div class="spec-label">USL: 0.103 | LSL: 0.091</div><div class="g4"><input class="dim-input" id="h1a" placeholder="1A" oninput="chk('h1','hollow')"><input class="dim-input" id="h1b" placeholder="1B" oninput="chk('h1','hollow')"><input class="dim-input" id="h1c" placeholder="1C" oninput="chk('h1','hollow')"><input class="dim-input" id="h1d" placeholder="1D" oninput="chk('h1','hollow')"></div><div class="avg-bar" id="h1avg">Promedio / Average —</div></div>
+      <div class="card"><div class="card-title">Dim 2 — Altura pata OD pequeño / Leg Height Small OD</div><div class="spec-label">USL: 0.115 | LSL: 0.075</div><div class="g4"><input class="dim-input" id="h2a" placeholder="2A" oninput="chk('h2','hollow')"><input class="dim-input" id="h2b" placeholder="2B" oninput="chk('h2','hollow')"><input class="dim-input" id="h2c" placeholder="2C" oninput="chk('h2','hollow')"><input class="dim-input" id="h2d" placeholder="2D" oninput="chk('h2','hollow')"></div><div class="avg-bar" id="h2avg">Promedio / Average —</div></div>
+      <div class="card"><div class="card-title">Dim 3 — Altura pata OD grande / Leg Height Large OD</div><div class="spec-label">USL: 0.160 | LSL: 0.120</div><div class="g4"><input class="dim-input" id="h3a" placeholder="3A" oninput="chk('h3','hollow')"><input class="dim-input" id="h3b" placeholder="3B" oninput="chk('h3','hollow')"><input class="dim-input" id="h3c" placeholder="3C" oninput="chk('h3','hollow')"><input class="dim-input" id="h3d" placeholder="3D" oninput="chk('h3','hollow')"></div><div class="avg-bar" id="h3avg">Promedio / Average —</div></div>
+      <div class="card"><div class="card-title">Aprobado/Falla — Hollow Gages</div>
+        <div class="field"><label>Dim 4 — Calibre ID / ID Gage 005458B</label><div class="pf-row"><button class="pfb" id="h4p" onclick="pf(this,'h4','P')">PASS</button><button class="pfb" id="h4f" onclick="pf(this,'h4','F')">FAIL</button></div></div>
+        <div class="field"><label>Dim 5 — Calibre OD / OD Gage 000340A</label><div class="pf-row"><button class="pfb" id="h5p" onclick="pf(this,'h5','P')">PASS</button><button class="pfb" id="h5f" onclick="pf(this,'h5','F')">FAIL</button></div></div>
+        <div class="field"><label>Dim 6 — Rebabas/Visual / Roll Offs</label><div class="pf-row"><button class="pfb" id="h6p" onclick="pf(this,'h6','P')">PASS</button><button class="pfb" id="h6f" onclick="pf(this,'h6','F')">FAIL</button></div></div>
       </div>
       <div class="card" style="border-color:var(--blue-border)">
-        <div class="card-title" style="color:var(--blue)">Shellac Visual — Hollow Parts</div>
+        <div class="card-title" style="color:var(--blue)">Visual Shellac — Partes Huecas / Hollow Parts</div>
         <div id="sh-hollow-na-bar" style="display:none;padding:8px 0;font-size:13px;color:var(--amber)">⚠ Shellac — Hollow is <strong>N/A for this entire lot</strong> &nbsp;<button class="btn sm" style="background:var(--bg3);color:var(--text2);border-color:var(--border2)" onclick="clearShellacNA('hollow')">Shellac back on — clear N/A</button></div>
         <div id="sh-hollow-content">
-          <div class="field"><label>Voids / Missing Shellac</label><div class="pf-row"><button class="pfb" id="sh1p" onclick="pf(this,'sh1','P')">OK</button><button class="pfb" id="sh1f" onclick="pf(this,'sh1','F')">FAIL</button></div></div>
-          <div class="field"><label>Too Much Shellac</label><div class="pf-row"><button class="pfb" id="sh2p" onclick="pf(this,'sh2','P')">OK</button><button class="pfb" id="sh2f" onclick="pf(this,'sh2','F')">FAIL</button></div></div>
-          <div class="field"><label>Off-Center Shellac</label><div class="pf-row"><button class="pfb" id="sh3p" onclick="pf(this,'sh3','P')">OK</button><button class="pfb" id="sh3f" onclick="pf(this,'sh3','F')">FAIL</button></div></div>
+          <div class="field"><label>Vacíos/Sin shellac / Voids / Missing Shellac</label><div class="pf-row"><button class="pfb" id="sh1p" onclick="pf(this,'sh1','P')">OK</button><button class="pfb" id="sh1f" onclick="pf(this,'sh1','F')">FAIL</button></div></div>
+          <div class="field"><label>Exceso de shellac / Too Much Shellac</label><div class="pf-row"><button class="pfb" id="sh2p" onclick="pf(this,'sh2','P')">OK</button><button class="pfb" id="sh2f" onclick="pf(this,'sh2','F')">FAIL</button></div></div>
+          <div class="field"><label>Shellac descentrado / Off-Center Shellac</label><div class="pf-row"><button class="pfb" id="sh3p" onclick="pf(this,'sh3','P')">OK</button><button class="pfb" id="sh3f" onclick="pf(this,'sh3','F')">FAIL</button></div></div>
         </div>
       </div>
     </div>
@@ -840,22 +829,22 @@ function renderInspect(){
       <button class="btn sm" style="background:var(--bg3);color:var(--text2);border-color:var(--border2)" onclick="clearNA('solid')">Undo</button>
     </div>
     <div id="solid-content">
-      <div style="text-align:right;margin-bottom:8px"><button class="na-toggle" id="na-btn-ss-solid" onclick="markShellacNA('solid')">Shellac not running on solid — mark N/A</button></div>
-      <div class="card"><div class="card-title">Dim 1 — Groove Depth 002838B</div><div class="spec-label">USL: 0.047 | LSL: 0.031</div><div class="g4"><input class="dim-input" id="s1a" placeholder="1A" oninput="chk('s1','solid')"><input class="dim-input" id="s1b" placeholder="1B" oninput="chk('s1','solid')"><input class="dim-input" id="s1c" placeholder="1C" oninput="chk('s1','solid')"><input class="dim-input" id="s1d" placeholder="1D" oninput="chk('s1','solid')"></div><div class="avg-bar" id="s1avg">Average —</div></div>
-      <div class="card"><div class="card-title">Dim 2 — Width Overall</div><div class="spec-label">USL: 0.351 | LSL: 0.335</div><div class="g4"><input class="dim-input" id="s2a" placeholder="2A" oninput="chk('s2','solid')"><input class="dim-input" id="s2b" placeholder="2B" oninput="chk('s2','solid')"><input class="dim-input" id="s2c" placeholder="2C" oninput="chk('s2','solid')"><input class="dim-input" id="s2d" placeholder="2D" oninput="chk('s2','solid')"></div><div class="avg-bar" id="s2avg">Average —</div></div>
-      <div class="card"><div class="card-title">Dim 3 — Leg Height</div><div class="spec-label">USL: 0.099 | LSL: 0.059</div><div class="g4"><input class="dim-input" id="s3a" placeholder="3A" oninput="chk('s3','solid')"><input class="dim-input" id="s3b" placeholder="3B" oninput="chk('s3','solid')"><input class="dim-input" id="s3c" placeholder="3C" oninput="chk('s3','solid')"><input class="dim-input" id="s3d" placeholder="3D" oninput="chk('s3','solid')"></div><div class="avg-bar" id="s3avg">Average —</div></div>
-      <div class="card"><div class="card-title">Pass / Fail — Solid Gages</div>
-        <div class="field"><label>Dim 4 — ID Gage 5.8761</label><div class="pf-row"><button class="pfb" id="s4p" onclick="pf(this,'s4','P')">PASS</button><button class="pfb" id="s4f" onclick="pf(this,'s4','F')">FAIL</button></div></div>
-        <div class="field"><label>Dim 5 — OD Gage 002769A</label><div class="pf-row"><button class="pfb" id="s5p" onclick="pf(this,'s5','P')">PASS</button><button class="pfb" id="s5f" onclick="pf(this,'s5','F')">FAIL</button></div></div>
-        <div class="field"><label>Dim 6 — Roll Offs / Visual</label><div class="pf-row"><button class="pfb" id="s6p" onclick="pf(this,'s6','P')">PASS</button><button class="pfb" id="s6f" onclick="pf(this,'s6','F')">FAIL</button></div></div>
+      <div style="text-align:right;margin-bottom:8px"><button class="na-toggle" id="na-btn-ss-solid" onclick="markShellacNA('solid')">Sin shellac en sólido / Shellac not running on solid — marcar N/A</button></div>
+      <div class="card"><div class="card-title">Dim 1 — Profundidad ranura / Groove Depth 002838B</div><div class="spec-label">USL: 0.047 | LSL: 0.031</div><div class="g4"><input class="dim-input" id="s1a" placeholder="1A" oninput="chk('s1','solid')"><input class="dim-input" id="s1b" placeholder="1B" oninput="chk('s1','solid')"><input class="dim-input" id="s1c" placeholder="1C" oninput="chk('s1','solid')"><input class="dim-input" id="s1d" placeholder="1D" oninput="chk('s1','solid')"></div><div class="avg-bar" id="s1avg">Promedio / Average —</div></div>
+      <div class="card"><div class="card-title">Dim 2 — Ancho total / Width Overall</div><div class="spec-label">USL: 0.351 | LSL: 0.335</div><div class="g4"><input class="dim-input" id="s2a" placeholder="2A" oninput="chk('s2','solid')"><input class="dim-input" id="s2b" placeholder="2B" oninput="chk('s2','solid')"><input class="dim-input" id="s2c" placeholder="2C" oninput="chk('s2','solid')"><input class="dim-input" id="s2d" placeholder="2D" oninput="chk('s2','solid')"></div><div class="avg-bar" id="s2avg">Promedio / Average —</div></div>
+      <div class="card"><div class="card-title">Dim 3 — Altura de pata / Leg Height</div><div class="spec-label">USL: 0.099 | LSL: 0.059</div><div class="g4"><input class="dim-input" id="s3a" placeholder="3A" oninput="chk('s3','solid')"><input class="dim-input" id="s3b" placeholder="3B" oninput="chk('s3','solid')"><input class="dim-input" id="s3c" placeholder="3C" oninput="chk('s3','solid')"><input class="dim-input" id="s3d" placeholder="3D" oninput="chk('s3','solid')"></div><div class="avg-bar" id="s3avg">Promedio / Average —</div></div>
+      <div class="card"><div class="card-title">Aprobado/Falla — Solid Gages</div>
+        <div class="field"><label>Dim 4 — Calibre ID / ID Gage 5.8761</label><div class="pf-row"><button class="pfb" id="s4p" onclick="pf(this,'s4','P')">PASS</button><button class="pfb" id="s4f" onclick="pf(this,'s4','F')">FAIL</button></div></div>
+        <div class="field"><label>Dim 5 — Calibre OD / OD Gage 002769A</label><div class="pf-row"><button class="pfb" id="s5p" onclick="pf(this,'s5','P')">PASS</button><button class="pfb" id="s5f" onclick="pf(this,'s5','F')">FAIL</button></div></div>
+        <div class="field"><label>Dim 6 — Rebabas/Visual / Roll Offs</label><div class="pf-row"><button class="pfb" id="s6p" onclick="pf(this,'s6','P')">PASS</button><button class="pfb" id="s6f" onclick="pf(this,'s6','F')">FAIL</button></div></div>
       </div>
       <div class="card" style="border-color:var(--blue-border)">
-        <div class="card-title" style="color:var(--blue)">Shellac Visual — Solid Parts</div>
+        <div class="card-title" style="color:var(--blue)">Visual Shellac — Partes Sólidas / Solid Parts</div>
         <div id="sh-solid-na-bar" style="display:none;padding:8px 0;font-size:13px;color:var(--amber)">⚠ Shellac — Solid is <strong>N/A for this entire lot</strong> &nbsp;<button class="btn sm" style="background:var(--bg3);color:var(--text2);border-color:var(--border2)" onclick="clearShellacNA('solid')">Shellac back on — clear N/A</button></div>
         <div id="sh-solid-content">
-          <div class="field"><label>Voids / Missing Shellac</label><div class="pf-row"><button class="pfb" id="ss1p" onclick="pf(this,'ss1','P')">OK</button><button class="pfb" id="ss1f" onclick="pf(this,'ss1','F')">FAIL</button></div></div>
-          <div class="field"><label>Too Much Shellac</label><div class="pf-row"><button class="pfb" id="ss2p" onclick="pf(this,'ss2','P')">OK</button><button class="pfb" id="ss2f" onclick="pf(this,'ss2','F')">FAIL</button></div></div>
-          <div class="field"><label>Off-Center Shellac</label><div class="pf-row"><button class="pfb" id="ss3p" onclick="pf(this,'ss3','P')">OK</button><button class="pfb" id="ss3f" onclick="pf(this,'ss3','F')">FAIL</button></div></div>
+          <div class="field"><label>Vacíos/Sin shellac / Voids / Missing Shellac</label><div class="pf-row"><button class="pfb" id="ss1p" onclick="pf(this,'ss1','P')">OK</button><button class="pfb" id="ss1f" onclick="pf(this,'ss1','F')">FAIL</button></div></div>
+          <div class="field"><label>Exceso de shellac / Too Much Shellac</label><div class="pf-row"><button class="pfb" id="ss2p" onclick="pf(this,'ss2','P')">OK</button><button class="pfb" id="ss2f" onclick="pf(this,'ss2','F')">FAIL</button></div></div>
+          <div class="field"><label>Shellac descentrado / Off-Center Shellac</label><div class="pf-row"><button class="pfb" id="ss3p" onclick="pf(this,'ss3','P')">OK</button><button class="pfb" id="ss3f" onclick="pf(this,'ss3','F')">FAIL</button></div></div>
         </div>
       </div>
       <div class="field" style="margin-top:6px"><label>Shellac notes (optional)</label><textarea id="sc-notes" rows="2" placeholder="Describe any shellac issues..."></textarea></div>
@@ -970,7 +959,7 @@ function chk(dim,type){
     el.className='dim-input '+(v>sp.usl?'hi':v<sp.lsl?'lo':'ok');return v;
   }).filter(v=>v!==null);
   const avgEl=document.getElementById(p+n+'avg');
-  if(!vals.length){avgEl.textContent='Average —';avgEl.className='avg-bar';return;}
+  if(!vals.length){avgEl.textContent='Promedio / Average —';avgEl.className='avg-bar';return;}
   const avg=vals.reduce((a,b)=>a+b)/vals.length;
   const ins=avg>=sp.lsl&&avg<=sp.usl;
   avgEl.textContent='AVG '+avg.toFixed(4)+(ins?' — IN SPEC ✓':avg>sp.usl?' — OVER USL ▲':' — UNDER LSL ▼');
@@ -995,10 +984,10 @@ function getDims(p,type){
 }
 async function submitInsp(){
   const op=document.getElementById('in-op')?.value.trim().toUpperCase();
-  if(!op){showMsg('in-msg','Enter operator initials','err');return;}
+  if(!op){showMsg('in-msg','Ingrese iniciales / Enter operator initials','err');return;}
   const lotSel=document.getElementById('in-lot-select');
   const lotNum=lotSel?lotSel.value:'';
-  if(!lotNum){showMsg('in-msg','Select a lot first','err');return;}
+  if(!lotNum){showMsg('in-msg','Seleccione un lote / Select a lot first','err');return;}
   const selectedLot=DB.lots.find(l=>l['Internal Lot #']===lotNum);
   const machine=selectedLot?selectedLot.Machine||'—':'—';
   const hd=getDims('h','hollow'),sd=getDims('s','solid');
@@ -1044,7 +1033,7 @@ async function submitInsp(){
     const el=document.getElementById(id);if(el){el.value='';el.className='dim-input';}
   });
   ['h1','h2','h3','s1','s2','s3'].forEach(id=>{
-    const el=document.getElementById(id+'avg');if(el){el.textContent='Average —';el.className='avg-bar';}
+    const el=document.getElementById(id+'avg');if(el){el.textContent='Promedio / Average —';el.className='avg-bar';}
   });
   ['h4','h5','h6','s4','s5','s6','sh1','sh2','sh3','ss1','ss2','ss3'].forEach(id=>{
     const pe=document.getElementById(id+'p');const fe=document.getElementById(id+'f');
@@ -1112,12 +1101,12 @@ function renderDowntime(){
     </div>
   </div>
   <button class="btn primary" id="btn-dt" onclick="submitDT()">Guardar / Save Downtime Record</button>
-  <button class="btn force" onclick="forceSyncDT()">Force Sync / Forzar sincronización</button>
+  <button class="btn force" onclick="forceSyncDT()">Forzar sincronización / Force Sync</button>
   <div id="dt-msg" class="msg"></div>`;
 }
 async function submitDT(){
   const op=document.getElementById('dt-op')?.value.trim().toUpperCase();
-  if(!op){showMsg('dt-msg','Enter operator initials','err');return;}
+  if(!op){showMsg('dt-msg','Ingrese iniciales / Enter operator initials','err');return;}
   const lot=document.getElementById('dt-lot-select')?.value||document.getElementById('dt-lot')?.value||'—';
   const ts=new Date().toISOString();
   const start=document.getElementById('dt-start')?.value;const end=document.getElementById('dt-end')?.value;
@@ -1178,12 +1167,12 @@ function renderReceive(){
       </div>
       <div id="sh-detail" style="display:none"></div>
       <div class="g2">
-        <div class="field"><label>Part Type / Tipo de parte</label><select id="sh-type"><option>Hollow / Hueco</option><option>Solid / Sólido</option><option>Both / Ambos</option></select></div>
-        <div class="field"><label>Qty Shipped / Cantidad enviada</label><input id="sh-qty" type="number" placeholder="3000" style="font-size:18px;padding:10px;text-align:center;background:#fff;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;width:100%"></div>
+        <div class="field"><label>Part Type / Tipo de parte</label><select id="sh-type"><option value="Both / Ambos" selected>Both / Ambos</option><option value="Hollow / Hueco">Hollow / Hueco</option><option value="Solid / Sólido">Solid / Sólido</option></select></div>
+        <div class="field"><label>Qty Shipped / Cantidad enviada</label><input id="sh-qty" type="number" value="3000" style="font-size:18px;padding:10px;text-align:center;background:#fff;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;width:100%"></div>
       </div>
       <div class="g2">
         <div class="field"><label>Shipped By / Enviado por</label><input id="sh-op" maxlength="6" placeholder="Iniciales" style="text-transform:uppercase;font-family:var(--mono)"></div>
-        <div class="field"><label>Customer PO / Orden de compra</label><input id="sh-po" placeholder="Opcional / Optional"></div>
+        <div class="field"><label>Customer PO / Orden de compra</label><input id="sh-po" placeholder="Opcional / Optional" value="${lastShipPO}"></div>
       </div>
       <div class="field"><label>Notes / Notas</label><input id="sh-notes" placeholder="Opcional / Optional"></div>
     </div>
@@ -1239,32 +1228,39 @@ async function submitShip(){
     saveLocalCache();
   }
   await fetchAllData();
+  // Save PO for next time before clearing
+  const poEl=document.getElementById('sh-po');
+  if(poEl&&poEl.value){lastShipPO=poEl.value;try{localStorage.setItem('hw-last-po',lastShipPO);}catch(e){}}
   setSavingState('btn-ship',false);
   showMsg('sh-msg','Enviado / Lot '+lotNum+' shipped and locked — Google Sheets ✓','ok');
-  ['sh-qty','sh-op','sh-po','sh-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  // Reset qty and type to defaults every time — NOT last used
+  const shQty=document.getElementById('sh-qty');if(shQty)shQty.value='3000';
+  const shType=document.getElementById('sh-type');if(shType)shType.value='Both / Ambos';
+  // Clear operator and notes but KEEP PO (last used)
+  ['sh-op','sh-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
 }
 
 // ==================== QUERY ====================
 function renderQuery(){
   return`
-  <div class="page-title">Query & Export</div>
-  <div class="page-sub">All data pulls live from Google Sheets</div>
+  <div class="page-title">Consultas y Exportar / Query & Export</div>
+  <div class="page-sub">Todos los datos se obtienen en vivo de Google Sheets / All data pulls live from Google Sheets</div>
   <div class="card">
-    <div class="card-title">Search Filters</div>
+    <div class="card-title">Filtros de búsqueda / Search Filters</div>
     <div class="g2">
-      <div class="field"><label>From Date</label><input type="date" id="q-from"></div>
-      <div class="field"><label>To Date</label><input type="date" id="q-to"></div>
-      <div class="field"><label>Internal Lot #</label><input id="q-lot" placeholder="e.g. 03-260422-01" style="font-family:var(--mono)"></div>
-      <div class="field"><label>Customer Lot #</label><input id="q-clot" placeholder="Type to search"></div>
-      <div class="field"><label>Machine</label><select id="q-mach"><option value="">All Machines</option><option>S&F #1</option><option>S&F #2</option><option>S&F #3</option><option>S&F #4</option><option>S&F #5</option></select></div>
-      <div class="field"><label>Record Type</label><select id="q-type"><option value="">All Types</option><option value="inspection">Inspection</option><option value="downtime">Downtime</option><option value="receiving">Receiving</option><option value="shipping">Shipping</option><option value="lot">Lots</option></select></div>
+      <div class="field"><label>Fecha desde / From Date</label><input type="date" id="q-from"></div>
+      <div class="field"><label>Fecha hasta / To Date</label><input type="date" id="q-to"></div>
+      <div class="field"><label>Lote interno # / Internal Lot #</label><input id="q-lot" placeholder="e.g. 03-260422-01" style="font-family:var(--mono)"></div>
+      <div class="field"><label>Lote cliente # / Customer Lot #</label><input id="q-clot" placeholder="Type to search"></div>
+      <div class="field"><label>Máquina / Machine</label><select id="q-mach"><option value="">Todas las máquinas / All Machines</option><option>S&F #1</option><option>S&F #2</option><option>S&F #3</option><option>S&F #4</option><option>S&F #5</option></select></div>
+      <div class="field"><label>Tipo de registro / Record Type</label><select id="q-type"><option value="">Todos los tipos / All Types</option><option value="inspection">Inspección / Inspection</option><option value="downtime">Tiempo Muerto / Downtime</option><option value="receiving">Receiving</option><option value="shipping">Shipping</option><option value="lot">Lots</option></select></div>
     </div>
   </div>
-  <button class="btn primary" onclick="runQ()">Search Records</button>
+  <button class="btn primary" onclick="runQ()">Buscar registros / Search Records</button>
   <div id="q-msg" class="msg"></div>
   <div id="q-results" style="margin-top:14px"></div>
   <div id="csv-section" style="display:none">
-    <div style="font-size:12px;font-weight:600;color:var(--text2);margin:14px 0 6px;font-family:var(--mono)">CSV — SELECT ALL AND COPY:</div>
+    <div style="font-size:12px;font-weight:600;color:var(--text2);margin:14px 0 6px;font-family:var(--mono)">CSV — SELECCIONE TODO Y COPIE / SELECT ALL AND COPY:</div>
     <div class="csv-box" id="csv-text"></div>
   </div>`;
 }
@@ -1314,7 +1310,7 @@ function renderCustDashboard(){
   const oosToday=todayInsp.filter(e=>e.oos).length;
   const readyHTML=closedNotShipped.length?`
     <table class="ship-table">
-      <thead><tr><th>Internal Lot #</th><th>Part Type</th><th>Good Parts</th><th>Customer Lots</th><th>Closed</th></tr></thead>
+      <thead><tr><th>Lote interno # / Internal Lot #</th><th>Part Type</th><th>Good Parts</th><th>Customer Lots</th><th>Closed</th></tr></thead>
       <tbody>${closedNotShipped.map(l=>`<tr>
         <td>${l['Internal Lot #']||''}</td>
         <td>${l['Part Type']||''}</td>
@@ -1322,44 +1318,44 @@ function renderCustDashboard(){
         <td style="font-size:11px">${l['Customer Lots']||'—'}</td>
         <td style="font-size:11px">${l['Start Time']?new Date(l['Start Time']).toLocaleDateString():''}</td>
       </tr>`).join('')}</tbody>
-    </table>`:'<p style="font-size:13px;color:var(--text3)">No lots ready to ship at this time.</p>';
+    </table>`:'<p style="font-size:13px;color:var(--text3)">Sin lotes listos para envío / No lots ready to ship at this time.</p>';
   const recentShipped=shippedLots.slice(-5).reverse();
   return`
   <div class="cust-dash">
-    <div class="cust-title">Honeywell Production — Live Dashboard</div>
-    <div class="cust-sub">Automation Systems | Read-only customer access | ${new Date().toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</div>
+    <div class="cust-title">Panel en vivo / Honeywell Production — Live Dashboard</div>
+    <div class="cust-sub">Automation Systems | Acceso de solo lectura / Read-only customer access | ${new Date().toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</div>
     <div class="metrics">
-      <div class="metric"><div class="val">${todayInsp.length}</div><div class="lbl">Inspections today</div></div>
-      <div class="metric oos"><div class="val">${oosToday}</div><div class="lbl">Out of spec today</div></div>
-      <div class="metric green"><div class="val">${closedNotShipped.length}</div><div class="lbl">Ready to ship</div></div>
-      <div class="metric blue"><div class="val">${shippedLots.length}</div><div class="lbl">Total lots shipped</div></div>
+      <div class="metric"><div class="val">${todayInsp.length}</div><div class="lbl">Inspecciones hoy / Inspections today</div></div>
+      <div class="metric oos"><div class="val">${oosToday}</div><div class="lbl">Fuera de spec hoy / Out of spec today</div></div>
+      <div class="metric green"><div class="val">${closedNotShipped.length}</div><div class="lbl">Listos para envío / Ready to ship</div></div>
+      <div class="metric blue"><div class="val">${shippedLots.length}</div><div class="lbl">Lotes enviados total / Total lots shipped</div></div>
     </div>
   </div>
   <div class="card">
-    <div class="card-title">Lots Ready to Ship</div>
+    <div class="card-title">Lotes listos para envío / Lots Ready to Ship</div>
     ${readyHTML}
   </div>
   <div class="card">
-    <div class="card-title">Recently Shipped</div>
-    ${recentShipped.length?recentShipped.map(l=>`<div class="log-row"><span><span style="font-family:var(--mono);font-size:13px;color:var(--green)">${l['Internal Lot #']||''}</span> — ${l['Part Type']||''} | ${l.Good||0} good parts<br><span style="font-size:11px;color:var(--text3)">${l['Customer Lots']||'—'}</span></span><span class="badge locked">SHIPPED</span></div>`).join(''):'<p style="font-size:13px;color:var(--text3)">No shipments yet.</p>'}
+    <div class="card-title">Enviados recientemente / Recently Shipped</div>
+    ${recentShipped.length?recentShipped.map(l=>`<div class="log-row"><span><span style="font-family:var(--mono);font-size:13px;color:var(--green)">${l['Internal Lot #']||''}</span> — ${l['Part Type']||''} | ${l.Good||0} good parts<br><span style="font-size:11px;color:var(--text3)">${l['Customer Lots']||'—'}</span></span><span class="badge locked">SHIPPED</span></div>`).join(''):'<p style="font-size:13px;color:var(--text3)">Sin envíos todavía / No shipments yet.</p>'}
   </div>`;
 }
 
 // ==================== CUSTOMER QUERY + PDF ====================
 function renderCustQuery(){
   return`
-  <div class="page-title">Query & Reports</div>
-  <div class="page-sub">Search by your lot numbers or date range. Download PDF reports for any lot.</div>
+  <div class="page-title">Consultas e Informes / Query & Reports</div>
+  <div class="page-sub">Busque por número de lote o rango de fechas. Descargue informes PDF / Search by your lot numbers or date range. Descargar PDF / Download PDF reports for any lot.</div>
   <div class="card">
-    <div class="card-title">Search Filters</div>
+    <div class="card-title">Filtros de búsqueda / Search Filters</div>
     <div class="g2">
-      <div class="field"><label>From Date</label><input type="date" id="cq-from"></div>
-      <div class="field"><label>To Date</label><input type="date" id="cq-to"></div>
-      <div class="field"><label>Internal Lot #</label><input id="cq-lot" placeholder="e.g. 03-260422-01" style="font-family:var(--mono)"></div>
-      <div class="field"><label>Your Customer Lot #</label><input id="cq-clot" placeholder="Your lot number"></div>
+      <div class="field"><label>Fecha desde / From Date</label><input type="date" id="cq-from"></div>
+      <div class="field"><label>Fecha hasta / To Date</label><input type="date" id="cq-to"></div>
+      <div class="field"><label>Lote interno # / Internal Lot #</label><input id="cq-lot" placeholder="e.g. 03-260422-01" style="font-family:var(--mono)"></div>
+      <div class="field"><label>Su lote de cliente # / Your Customer Lot #</label><input id="cq-clot" placeholder="Your lot number"></div>
     </div>
   </div>
-  <button class="btn primary" onclick="runCustQ()">Search</button>
+  <button class="btn primary" onclick="runCustQ()">Buscar / Search</button>
   <div id="cq-msg" class="msg"></div>
   <div id="cq-results" style="margin-top:14px"></div>`;
 }
@@ -1376,11 +1372,11 @@ function runCustQ(){
     return true;
   });
   const el=document.getElementById('cq-results');
-  if(!lots.length){if(el)el.innerHTML='<p style="color:var(--text3);font-size:13px">No lots found.</p>';return;}
+  if(!lots.length){if(el)el.innerHTML='<p style="color:var(--text3);font-size:13px">Sin lotes encontrados / No lots found.</p>';return;}
   if(el)el.innerHTML='<div class="card">'+lots.map(l=>{
     const qCount=DB.quality.filter(q=>q['Internal Lot #']===l['Internal Lot #']).length;
     const oosCount=DB.quality.filter(q=>q['Internal Lot #']===l['Internal Lot #']&&q['OOS Flag']==='OOS').length;
-    return`<div class="log-row"><div><div style="font-family:var(--mono);font-size:14px;font-weight:600;color:var(--green)">${l['Internal Lot #']||''}</div><div style="font-size:11px;color:var(--text3);margin-top:2px">${l['Part Type']||''} | Good: ${l.Good||0} | Customer lots: ${l['Customer Lots']||'—'}</div><div style="font-size:11px;color:var(--text3)">${qCount} inspections | ${oosCount} OOS events</div></div><button class="btn sm" style="background:var(--blue-bg);border-color:var(--blue-border);color:var(--blue)" onclick="generatePDF('${l['Internal Lot #']}')">Download PDF</button></div>`;
+    return`<div class="log-row"><div><div style="font-family:var(--mono);font-size:14px;font-weight:600;color:var(--green)">${l['Internal Lot #']||''}</div><div style="font-size:11px;color:var(--text3);margin-top:2px">${l['Part Type']||''} | Good: ${l.Good||0} | Customer lots: ${l['Customer Lots']||'—'}</div><div style="font-size:11px;color:var(--text3)">${qCount} inspections | ${oosCount} OOS events</div></div><button class="btn sm" style="background:var(--blue-bg);border-color:var(--blue-border);color:var(--blue)" onclick="generatePDF('${l['Internal Lot #']}')">Descargar PDF / Download PDF</button></div>`;
   }).join('')+'</div>';
   showMsg('cq-msg',lots.length+' lots found','ok');
 }
@@ -1409,7 +1405,7 @@ function generatePDF(lotNum){
       </div>
       <div style="margin-bottom:16px">
         <table style="width:100%;border-collapse:collapse;font-size:12px">
-          <tr><td style="padding:4px 8px;border:1px solid #ccc;background:#f5f5f5;font-weight:600;width:150px">Internal Lot #</td><td style="padding:4px 8px;border:1px solid #ccc;font-family:monospace;font-weight:700">${lotNum}</td><td style="padding:4px 8px;border:1px solid #ccc;background:#f5f5f5;font-weight:600;width:150px">Machine</td><td style="padding:4px 8px;border:1px solid #ccc">${lot.Machine||'—'}</td></tr>
+          <tr><td style="padding:4px 8px;border:1px solid #ccc;background:#f5f5f5;font-weight:600;width:150px">Lote interno # / Internal Lot #</td><td style="padding:4px 8px;border:1px solid #ccc;font-family:monospace;font-weight:700">${lotNum}</td><td style="padding:4px 8px;border:1px solid #ccc;background:#f5f5f5;font-weight:600;width:150px">Máquina / Machine</td><td style="padding:4px 8px;border:1px solid #ccc">${lot.Machine||'—'}</td></tr>
           <tr><td style="padding:4px 8px;border:1px solid #ccc;background:#f5f5f5;font-weight:600">Part Type</td><td style="padding:4px 8px;border:1px solid #ccc">${lot['Part Type']||'—'}</td><td style="padding:4px 8px;border:1px solid #ccc;background:#f5f5f5;font-weight:600">Start Date</td><td style="padding:4px 8px;border:1px solid #ccc">${lot['Start Time']?new Date(lot['Start Time']).toLocaleDateString():'—'}</td></tr>
           <tr><td style="padding:4px 8px;border:1px solid #ccc;background:#f5f5f5;font-weight:600">Customer Lots</td><td style="padding:4px 8px;border:1px solid #ccc" colspan="3">${lot['Customer Lots']||'—'}</td></tr>
           <tr><td style="padding:4px 8px;border:1px solid #ccc;background:#f5f5f5;font-weight:600">Good Parts</td><td style="padding:4px 8px;border:1px solid #ccc">${lot.Good||0}</td><td style="padding:4px 8px;border:1px solid #ccc;background:#f5f5f5;font-weight:600">Scrap</td><td style="padding:4px 8px;border:1px solid #ccc">${lot.Scrap||0}</td></tr>
@@ -1419,14 +1415,14 @@ function generatePDF(lotNum){
       </div>
       ${quality.length?`
       <div style="margin-bottom:16px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px;border-bottom:1px solid #ccc;padding-bottom:4px">INSPECTION DATA — HOLLOW DIMENSIONS</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;border-bottom:1px solid #ccc;padding-bottom:4px">DATOS DE INSPECCIÓN — DIMENSIONES HUECAS / HOLLOW DIMENSIONS</div>
         <table class="pdf-table" style="width:100%;border-collapse:collapse;font-size:10px">
           <thead><tr style="background:#f0f0f0"><th style="border:1px solid #ccc;padding:4px">Timestamp</th><th style="border:1px solid #ccc;padding:4px">Operator</th><th style="border:1px solid #ccc;padding:4px">H-Voids</th><th style="border:1px solid #ccc;padding:4px">H-Excess</th><th style="border:1px solid #ccc;padding:4px">H-OffCtr</th><th style="border:1px solid #ccc;padding:4px">S-Voids</th><th style="border:1px solid #ccc;padding:4px">S-Excess</th><th style="border:1px solid #ccc;padding:4px">S-OffCtr</th><th style="border:1px solid #ccc;padding:4px">N/A</th><th style="border:1px solid #ccc;padding:4px">OOS</th></tr></thead>
           <tbody>${quality.map(q=>`<tr><td style="border:1px solid #ccc;padding:3px 4px">${q.Timestamp?new Date(q.Timestamp).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):''}</td><td style="border:1px solid #ccc;padding:3px 4px">${q.Operator||''}</td><td style="border:1px solid #ccc;padding:3px 4px">${q['Shellac-H Voids']||'—'}</td><td style="border:1px solid #ccc;padding:3px 4px">${q['Shellac-H Excess']||'—'}</td><td style="border:1px solid #ccc;padding:3px 4px">${q['Shellac-H Off-Center']||'—'}</td><td style="border:1px solid #ccc;padding:3px 4px">${q['Shellac-S Voids']||'—'}</td><td style="border:1px solid #ccc;padding:3px 4px">${q['Shellac-S Excess']||'—'}</td><td style="border:1px solid #ccc;padding:3px 4px">${q['Shellac-S Off-Center']||'—'}</td><td style="border:1px solid #ccc;padding:3px 4px">${q['Shellac N/A']||''}</td><td style="border:1px solid #ccc;padding:3px 4px;color:${q['OOS Flag']==='OOS'?'#c00':'#060'};font-weight:600">${q['OOS Flag']||'OK'}</td></tr>`).join('')}</tbody>
         </table>
       </div>
       <div style="margin-bottom:16px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px;border-bottom:1px solid #ccc;padding-bottom:4px">INSPECTION DATA — SOLID DIMENSIONS</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;border-bottom:1px solid #ccc;padding-bottom:4px">DATOS DE INSPECCIÓN — DIMENSIONES SÓLIDAS / SOLID DIMENSIONS</div>
         <table class="pdf-table" style="width:100%;border-collapse:collapse;font-size:10px">
           <thead><tr style="background:#f0f0f0"><th style="border:1px solid #ccc;padding:4px">Timestamp</th><th style="border:1px solid #ccc;padding:4px">Operator</th><th style="border:1px solid #ccc;padding:4px">S1 Avg</th><th style="border:1px solid #ccc;padding:4px">S2 Avg</th><th style="border:1px solid #ccc;padding:4px">S3 Avg</th><th style="border:1px solid #ccc;padding:4px">S4 ID</th><th style="border:1px solid #ccc;padding:4px">S5 OD</th><th style="border:1px solid #ccc;padding:4px">S6 Vis</th><th style="border:1px solid #ccc;padding:4px">Solid N/A</th><th style="border:1px solid #ccc;padding:4px">OOS</th></tr></thead>
           <tbody>${quality.map(q=>`<tr><td style="border:1px solid #ccc;padding:3px 4px">${q.Timestamp?new Date(q.Timestamp).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):''}</td><td style="border:1px solid #ccc;padding:3px 4px">${q.Operator||''}</td><td style="border:1px solid #ccc;padding:3px 4px;font-family:monospace">${q['S1 Avg']||'—'}</td><td style="border:1px solid #ccc;padding:3px 4px;font-family:monospace">${q['S2 Avg']||'—'}</td><td style="border:1px solid #ccc;padding:3px 4px;font-family:monospace">${q['S3 Avg']||'—'}</td><td style="border:1px solid #ccc;padding:3px 4px">${q['S4 ID']||'—'}</td><td style="border:1px solid #ccc;padding:3px 4px">${q['S5 OD']||'—'}</td><td style="border:1px solid #ccc;padding:3px 4px">${q['S6 Visual']||'—'}</td><td style="border:1px solid #ccc;padding:3px 4px">${q['Solid N/A']||''}</td><td style="border:1px solid #ccc;padding:3px 4px;color:${q['OOS Flag']==='OOS'?'#c00':'#060'};font-weight:600">${q['OOS Flag']||'OK'}</td></tr>`).join('')}</tbody>
@@ -1434,16 +1430,16 @@ function generatePDF(lotNum){
       </div>`:''}
       ${downtime.length?`
       <div style="margin-bottom:16px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px;border-bottom:1px solid #ccc;padding-bottom:4px">DOWNTIME / MAINTENANCE LOG</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;border-bottom:1px solid #ccc;padding-bottom:4px">REGISTRO DE TIEMPO MUERTO / DOWNTIME LOG</div>
         <table style="width:100%;border-collapse:collapse;font-size:10px">
-          <thead><tr style="background:#f0f0f0"><th style="border:1px solid #ccc;padding:4px">Date/Time</th><th style="border:1px solid #ccc;padding:4px">Machine</th><th style="border:1px solid #ccc;padding:4px">Type</th><th style="border:1px solid #ccc;padding:4px">Duration</th><th style="border:1px solid #ccc;padding:4px">Description</th><th style="border:1px solid #ccc;padding:4px">Corrective Action</th></tr></thead>
+          <thead><tr style="background:#f0f0f0"><th style="border:1px solid #ccc;padding:4px">Date/Time</th><th style="border:1px solid #ccc;padding:4px">Máquina / Machine</th><th style="border:1px solid #ccc;padding:4px">Type</th><th style="border:1px solid #ccc;padding:4px">Duration</th><th style="border:1px solid #ccc;padding:4px">Description</th><th style="border:1px solid #ccc;padding:4px">Corrective Action</th></tr></thead>
           <tbody>${downtime.map(d=>`<tr><td style="border:1px solid #ccc;padding:3px 4px">${d.Timestamp?new Date(d.Timestamp).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):''}</td><td style="border:1px solid #ccc;padding:3px 4px">${d.Machine||''}</td><td style="border:1px solid #ccc;padding:3px 4px">${d.Type||''}</td><td style="border:1px solid #ccc;padding:3px 4px">${d['Duration (min)']||0} min</td><td style="border:1px solid #ccc;padding:3px 4px">${d.Description||''}</td><td style="border:1px solid #ccc;padding:3px 4px">${d['Corrective Action']||''}</td></tr>`).join('')}</tbody>
         </table>
       </div>`:''}
       <div style="margin-top:40px;border-top:1px solid #ccc;padding-top:12px;font-size:11px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px">
-        <div><div style="font-weight:600;margin-bottom:20px">Prepared by:</div><div style="border-top:1px solid #000;padding-top:4px">Signature / Date</div></div>
-        <div><div style="font-weight:600;margin-bottom:20px">Reviewed by:</div><div style="border-top:1px solid #000;padding-top:4px">Signature / Date</div></div>
-        <div><div style="font-weight:600;margin-bottom:20px">Approved by:</div><div style="border-top:1px solid #000;padding-top:4px">Signature / Date</div></div>
+        <div><div style="font-weight:600;margin-bottom:20px">Preparado por / Prepared by:</div><div style="border-top:1px solid #000;padding-top:4px">Firma / Fecha — Signature / Date</div></div>
+        <div><div style="font-weight:600;margin-bottom:20px">Revisado por / Reviewed by:</div><div style="border-top:1px solid #000;padding-top:4px">Firma / Fecha — Signature / Date</div></div>
+        <div><div style="font-weight:600;margin-bottom:20px">Aprobado por / Approved by:</div><div style="border-top:1px solid #000;padding-top:4px">Firma / Fecha — Signature / Date</div></div>
       </div>
     </div>`;
   window.print();
@@ -1473,7 +1469,7 @@ function renderDebug(){
   <div class="card">
     <div class="card-title">All lots in DB</div>
     ${DB.lots.length?`<table style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
-      <thead><tr style="border-bottom:1px solid var(--border)"><th style="text-align:left;padding:4px;color:var(--text3)">Lot #</th><th style="text-align:left;padding:4px;color:var(--text3)">Machine</th><th style="text-align:left;padding:4px;color:var(--text3)">Status</th><th style="text-align:left;padding:4px;color:var(--text3)">Date</th></tr></thead>
+      <thead><tr style="border-bottom:1px solid var(--border)"><th style="text-align:left;padding:4px;color:var(--text3)">Lot #</th><th style="text-align:left;padding:4px;color:var(--text3)">Máquina / Machine</th><th style="text-align:left;padding:4px;color:var(--text3)">Status</th><th style="text-align:left;padding:4px;color:var(--text3)">Date</th></tr></thead>
       <tbody>${DB.lots.map(l=>`<tr style="border-bottom:1px solid var(--border)"><td style="padding:4px;color:var(--green)">${l['Internal Lot #']||''}</td><td style="padding:4px;color:var(--text2)">${l.Machine||''}</td><td style="padding:4px;color:${(l.Status||'').includes('OPEN')?'var(--green)':'var(--text3)'}">${l.Status||'—'}</td><td style="padding:4px;color:var(--text2)">${l.Date||''}</td></tr>`).join('')}</tbody>
     </table>`:'<p style="font-size:13px;color:var(--text3)">No lots loaded.</p>'}
   </div>`;
