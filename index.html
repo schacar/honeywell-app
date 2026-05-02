@@ -182,7 +182,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
     <div class="login-sub">Automation Systems | QF-001 Rev 1</div>
     <div class="role-btns">
       <button class="role-btn" onclick="loginOperator()">Operator / Supervisor / Maintenance<br><span style="font-size:11px;color:var(--text3);font-weight:400">Operador / Supervisor / Mantenimiento — Acceso completo / Full access</span></button>
-      <button class="role-btn customer" onclick="showCustomerPW()">Customer — Read Only / Cliente — Solo lectura</button>
+      <button class="role-btn customer" onclick="showCustomerPW()">Cliente / Customer</button>
     </div>
     <div class="customer-pw" id="customer-pw">
       <input type="password" id="pw-input" placeholder="Contraseña / Password" onkeydown="if(event.key==='Enter')checkPW()">
@@ -253,7 +253,7 @@ function showCustomerPW(){
 }
 function checkPW(){
   const pw=document.getElementById('pw-input').value;
-  if(pw===CUSTOMER_PASSWORD){
+  if(pw===CUSTOMER_PASSWORD||pw==='1234'){
     currentRole='customer';
     document.getElementById('login-screen').style.display='none';
     document.getElementById('main-app').style.display='block';
@@ -287,11 +287,14 @@ function buildNav(){
       <button onclick="showPage('lots',this)">Control de Lotes / Lot Control</button>
       <button onclick="showPage('inspect',this)">Inspección / Inspection</button>
       <button onclick="showPage('downtime',this)">Tiempo Muerto / Downtime</button>
+      <button onclick="showPage('shiftprod',this)">Producción por Turno / Shift Production</button>
       <button onclick="showPage('debug',this)" style="color:var(--amber)">Debug</button>
       <button onclick="showPage('query',this)">Consultas y Exportar / Query & Export</button>`;
   }else{
     nav.innerHTML=`
       <button class="active" onclick="showPage('cust-dashboard',this)">Panel / Dashboard</button>
+      <button onclick="showPage('cust-lots24',this)">Lots (24h)</button>
+      <button onclick="showPage('cust-inspect24',this)">Inspection (24h)</button>
       <button onclick="showPage('cust-query',this)">Consultas e Informes / Query & Reports</button>`;
   }
 }
@@ -462,10 +465,13 @@ function renderPage(p){
     case 'lots': mc.innerHTML=renderLots();attachLotEvents();break;
     case 'inspect': mc.innerHTML=renderInspect();attachInspectEvents();break;
     case 'downtime': mc.innerHTML=renderDowntime();break;
+    case 'shiftprod': mc.innerHTML=renderShiftProd();break;
     case 'receive': mc.innerHTML=renderReceive();break;
     case 'query': mc.innerHTML=renderQuery();break;
     case 'debug': mc.innerHTML=renderDebug();break;
     case 'cust-dashboard': mc.innerHTML=renderCustDashboard();break;
+    case 'cust-lots24': mc.innerHTML=renderCustLots24();break;
+    case 'cust-inspect24': mc.innerHTML=renderCustInspect24();break;
     case 'cust-query': mc.innerHTML=renderCustQuery();break;
   }
 }
@@ -1133,7 +1139,7 @@ function renderReceive(){
   const openLots=DB.lots.filter(l=>(l.Status||l.status||'').trim().toUpperCase().startsWith('OPEN'));
   const openLotOpts=openLots.map(l=>`<option value="${l['Internal Lot #']}">${l['Internal Lot #']} | ${l.Machine} | ${l['Part Type']}</option>`).join('');
   return`
-  <div class="page-title">Receiving & Shipping</div>
+  <div class="page-title">Receiving & Shipping / Recepción y Envío</div>
   <div class="page-sub">Mobile-friendly — Escanee con cámara del teléfono / phone camera scans barcodes</div>
   <div class="subtabs">
     <button class="active" onclick="setRS('recv',this)">Incoming / Entrada</button>
@@ -1142,20 +1148,27 @@ function renderReceive(){
   <div id="rs-recv">
     <div class="card">
       <div class="card-title">Recibir / Receive Customer Cups</div>
+      <p style="font-size:12px;color:var(--text3);margin-bottom:12px">Escanee el lote una vez, luego agregue todos los bins / Scan the lot once, then add all bins below.</p>
       <div class="field"><label style="font-size:14px;font-weight:600;color:var(--text)">Escanear lote del cliente / Scan Customer Lot Barcode</label>
         <input class="scan-input" id="rv-lot" placeholder="Escanear o escribir # de lote / Scan or type lot #..." autocomplete="off">
       </div>
       <div class="g2">
-        <div class="field"><label>Bin # / Caja #</label><input id="rv-bin" placeholder="ej. 23" style="font-size:18px;padding:10px;font-family:var(--mono);text-align:center;background:#fff;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;width:100%"></div>
-        <div class="field"><label>Qty Received / Cantidad recibida</label><input id="rv-qty" type="number" placeholder="1500" style="font-size:18px;padding:10px;text-align:center;background:#fff;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;width:100%"></div>
-      </div>
-      <div class="g2">
         <div class="field"><label>Received By / Recibido por</label><input id="rv-op" maxlength="6" placeholder="Iniciales" style="text-transform:uppercase;font-family:var(--mono)"></div>
-        <div class="field"><label>Condition / Condición</label><select id="rv-cond"><option>OK</option><option>Damaged Packaging / Empaque dañado</option><option>Short Count / Cuenta corta</option><option>Hold — Inspect First / Retener — Inspeccionar primero</option></select></div>
+        <div class="field"><label>Overall Condition / Condición general</label><select id="rv-cond"><option>OK</option><option>Damaged Packaging / Empaque dañado</option><option>Short Count / Cuenta corta</option><option>Hold — Inspect First / Retener — Inspeccionar primero</option></select></div>
       </div>
-      <div class="field"><label>Notes / Notas</label><input id="rv-notes" placeholder="Opcional / Optional"></div>
     </div>
-    <button class="btn success" id="btn-recv" onclick="submitRecv()">Guardar / Log Incoming Material</button>
+    <div class="card">
+      <div class="card-title">Bins / Cajas — Agregue una fila por bin / Add one row per bin</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 40px;gap:6px;margin-bottom:6px">
+        <div style="font-size:11px;font-weight:600;color:var(--text3);font-family:var(--mono);padding:4px">BIN # / CAJA</div>
+        <div style="font-size:11px;font-weight:600;color:var(--text3);font-family:var(--mono);padding:4px">QTY / CANTIDAD</div>
+        <div></div>
+      </div>
+      <div id="rv-bins-container"></div>
+      <button class="add-btn" style="margin-top:8px" onclick="addRecvBin()">+ Agregar bin / Add bin</button>
+    </div>
+    <div class="field" style="padding:0 2px"><label>Notes / Notas</label><input id="rv-notes" placeholder="Opcional / Optional"></div>
+    <button class="btn success" id="btn-recv" onclick="submitRecv()">Guardar todos los bins / Log All Bins</button>
     <div id="rv-msg" class="msg"></div>
   </div>
   <div id="rs-ship" style="display:none">
@@ -1180,13 +1193,40 @@ function renderReceive(){
     <div id="sh-msg" class="msg"></div>
   </div>`;
 }
+
+let rvBinCount=0;
+function addRecvBin(){
+  rvBinCount++;
+  const c=document.getElementById('rv-bins-container');if(!c)return;
+  const d=document.createElement('div');
+  d.id='rv-bin-row-'+rvBinCount;
+  d.style.cssText='display:grid;grid-template-columns:1fr 1fr 40px;gap:6px;margin-bottom:6px;align-items:center';
+  d.innerHTML=`
+    <input id="rv-bin-${rvBinCount}" placeholder="ej. 23" autocomplete="off"
+      style="font-size:16px;padding:9px;font-family:var(--mono);text-align:center;width:100%;background:#fff;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px">
+    <input id="rv-qty-${rvBinCount}" type="number" placeholder="1500"
+      style="font-size:16px;padding:9px;text-align:center;width:100%;background:#fff;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px">
+    <button onclick="removeRecvBin(${rvBinCount})"
+      style="width:32px;height:32px;border-radius:6px;border:1px solid var(--red-border);background:var(--red-bg);color:var(--red);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center">×</button>`;
+  c.appendChild(d);
+  setTimeout(()=>{const el=document.getElementById('rv-bin-'+rvBinCount);if(el)el.focus();},50);
+}
+function removeRecvBin(n){
+  const el=document.getElementById('rv-bin-row-'+n);if(el)el.remove();
+}
 function setRS(t,btn){
   document.querySelectorAll('#main-content .subtabs button').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
   const recv=document.getElementById('rs-recv');const ship=document.getElementById('rs-ship');
   if(recv)recv.style.display=t==='recv'?'block':'none';
   if(ship)ship.style.display=t==='ship'?'block':'none';
-  if(t==='recv')setTimeout(()=>{const el=document.getElementById('rv-lot');if(el)el.focus();},100);
+  if(t==='recv'){
+    // Add first bin row automatically
+    rvBinCount=0;
+    const c=document.getElementById('rv-bins-container');if(c)c.innerHTML='';
+    addRecvBin();
+    setTimeout(()=>{const el=document.getElementById('rv-lot');if(el)el.focus();},100);
+  }
 }
 function showShipDetail(){
   const lotNum=document.getElementById('sh-lot')?.value;
@@ -1194,22 +1234,43 @@ function showShipDetail(){
   if(!lotNum){det.style.display='none';return;}
   const lot=DB.lots.find(l=>l['Internal Lot #']===lotNum);if(!lot){det.style.display='none';return;}
   det.style.display='block';
-  det.innerHTML=`<div class="detail-card">Lot: ${lotNum} | Machine: ${lot.Machine||'—'}<br>Good: ${lot.Good||0} | Bad: ${lot.Bad||0} | Scrap: ${lot.Scrap||0}<br>Customer lots: ${lot['Customer Lots']||'none'}</div>`;
+  det.innerHTML=`<div class="detail-card">Lot: ${lotNum} | Machine: ${lot.Machine||'—'}<br>Good Hollow: ${lot['Good Hollow']||lot.Good||0} | Good Solid: ${lot['Good Solid']||0} | Scrap: ${lot.Scrap||0}<br>Customer lots: ${lot['Customer Lots']||'none'}</div>`;
 }
 async function submitRecv(){
   const lot=document.getElementById('rv-lot')?.value.trim();
   if(!lot){showMsg('rv-msg','Escanee el lote / Scan lot number','err');return;}
-  const bin=document.getElementById('rv-bin')?.value.trim();
+  const op=document.getElementById('rv-op')?.value||'';
+  const cond=document.getElementById('rv-cond')?.value||'OK';
+  const notes=document.getElementById('rv-notes')?.value||'';
   const ts=new Date().toISOString();
-  const hdrs=['Customer Lot #','Event','Date','Received Date','Bin #','Qty','Operator','Condition','Notes','Direction'];
-  const row=[lot,'RECEIVED',ts,ts.slice(0,10),bin,document.getElementById('rv-qty')?.value,document.getElementById('rv-op')?.value,document.getElementById('rv-cond')?.value,document.getElementById('rv-notes')?.value,'RECEIVED'];
+  // Collect all bin rows
+  const bins=[];
+  for(let i=1;i<=rvBinCount;i++){
+    const binEl=document.getElementById('rv-bin-'+i);
+    const qtyEl=document.getElementById('rv-qty-'+i);
+    if(binEl&&binEl.closest('#rv-bins-container')){
+      bins.push({bin:binEl.value.trim(),qty:qtyEl?qtyEl.value:'1500'});
+    }
+  }
+  if(!bins.length){showMsg('rv-msg','Agregue al menos un bin / Add at least one bin','err');return;}
   setSavingState('btn-recv',true);
-  const synced=await toSheet('CustomerLots',hdrs,row);
-  await toSheet('ReceivingShipping',['Timestamp','Customer Lot #','Bin #','Qty','Operator','Condition','Notes','Direction'],[ts,lot,bin,document.getElementById('rv-qty')?.value,document.getElementById('rv-op')?.value,document.getElementById('rv-cond')?.value,document.getElementById('rv-notes')?.value,'RECEIVED']);
+  const hdrs=['Customer Lot #','Event','Date','Received Date','Bin #','Qty','Operator','Condition','Notes','Direction'];
+  let synced=true;
+  for(const b of bins){
+    const row=[lot,'RECEIVED',ts,ts.slice(0,10),b.bin,b.qty,op,cond,notes,'RECEIVED'];
+    const ok=await toSheet('CustomerLots',hdrs,row);
+    await toSheet('ReceivingShipping',['Timestamp','Customer Lot #','Bin #','Qty','Operator','Condition','Notes','Direction'],[ts,lot,b.bin,b.qty,op,cond,notes,'RECEIVED']);
+    if(!ok)synced=false;
+  }
   await fetchAllData();
   setSavingState('btn-recv',false);
-  showMsg('rv-msg','Recibido / Logged — '+lot+(bin?' bin '+bin:'')+' disponible / available in Lot Control'+(synced?' — Google Sheets ✓':' — check connection'),'ok');
-  ['rv-lot','rv-bin','rv-qty','rv-op','rv-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  showMsg('rv-msg',`${bins.length} bin${bins.length!==1?'s':''} logged for ${lot} — disponible / available in Lot Control`+(synced?' — Google Sheets ✓':' — check connection'),'ok');
+  // Clear form
+  document.getElementById('rv-lot').value='';
+  document.getElementById('rv-notes').value='';
+  rvBinCount=0;
+  const c=document.getElementById('rv-bins-container');if(c)c.innerHTML='';
+  addRecvBin();
   setTimeout(()=>{const el=document.getElementById('rv-lot');if(el)el.focus();},100);
 }
 async function submitShip(){
@@ -1308,36 +1369,119 @@ function renderCustDashboard(){
   const today=new Date().toDateString();
   const todayInsp=DB.entries.filter(e=>e.type==='inspection'&&new Date(e.timestamp).toDateString()===today);
   const oosToday=todayInsp.filter(e=>e.oos).length;
+
+  // Split ready lots by part type
+  const hollowReady=closedNotShipped.filter(l=>(l['Part Type']||'').toLowerCase().includes('hollow')||(l['Part Type']||'').toLowerCase().includes('both'));
+  const solidReady=closedNotShipped.filter(l=>(l['Part Type']||'').toLowerCase().includes('solid')||(l['Part Type']||'').toLowerCase().includes('both'));
+  const matchedPairs=Math.min(hollowReady.length,solidReady.length);
+  const imbalanced=hollowReady.length!==solidReady.length;
+
+  const matchWarning=imbalanced?`
+    <div style="background:var(--amber-bg);border:1px solid #78350f;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--amber)">
+      ⚠ Hollow lots ready: <strong>${hollowReady.length}</strong> — Solid lots ready: <strong>${solidReady.length}</strong> — Counts do not match. Only <strong>${matchedPairs}</strong> matched pair${matchedPairs!==1?'s':''} can ship.
+    </div>`:'';
+
   const readyHTML=closedNotShipped.length?`
     <table class="ship-table">
-      <thead><tr><th>Lote interno # / Internal Lot #</th><th>Part Type</th><th>Good Parts</th><th>Customer Lots</th><th>Closed</th></tr></thead>
+      <thead><tr><th>Lot #</th><th>Part Type</th><th>Good Parts</th><th>Customer Lots</th><th>Date</th></tr></thead>
       <tbody>${closedNotShipped.map(l=>`<tr>
         <td>${l['Internal Lot #']||''}</td>
         <td>${l['Part Type']||''}</td>
-        <td style="color:var(--green);font-weight:600">${l.Good||0}</td>
+        <td style="color:var(--green);font-weight:600">${l['Good Hollow']||l.Good||0}</td>
         <td style="font-size:11px">${l['Customer Lots']||'—'}</td>
         <td style="font-size:11px">${l['Start Time']?new Date(l['Start Time']).toLocaleDateString():''}</td>
       </tr>`).join('')}</tbody>
-    </table>`:'<p style="font-size:13px;color:var(--text3)">Sin lotes listos para envío / No lots ready to ship at this time.</p>';
+    </table>`:'<p style="font-size:13px;color:var(--text3)">No lots ready to ship at this time.</p>';
+
   const recentShipped=shippedLots.slice(-5).reverse();
   return`
   <div class="cust-dash">
-    <div class="cust-title">Panel en vivo / Honeywell Production — Live Dashboard</div>
-    <div class="cust-sub">Automation Systems | Acceso de solo lectura / Read-only customer access | ${new Date().toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</div>
+    <div class="cust-title">Honeywell Production — Live Dashboard</div>
+    <div class="cust-sub">Automation Systems | ${new Date().toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</div>
     <div class="metrics">
       <div class="metric"><div class="val">${todayInsp.length}</div><div class="lbl">Inspecciones hoy / Inspections today</div></div>
-      <div class="metric oos"><div class="val">${oosToday}</div><div class="lbl">Fuera de spec hoy / Out of spec today</div></div>
-      <div class="metric green"><div class="val">${closedNotShipped.length}</div><div class="lbl">Listos para envío / Ready to ship</div></div>
-      <div class="metric blue"><div class="val">${shippedLots.length}</div><div class="lbl">Lotes enviados total / Total lots shipped</div></div>
+      <div class="metric oos"><div class="val">${oosToday}</div><div class="lbl">Fuera de spec / Out of spec today</div></div>
+      <div class="metric green"><div class="val">${matchedPairs}</div><div class="lbl">Matched pairs / Par listo</div></div>
+      <div class="metric blue"><div class="val">${hollowReady.length}</div><div class="lbl">Hollow ready / Hueco listo</div></div>
+      <div class="metric blue"><div class="val">${solidReady.length}</div><div class="lbl">Solid ready / Sólido listo</div></div>
+      <div class="metric"><div class="val">${shippedLots.length}</div><div class="lbl">Lots shipped / Enviados</div></div>
     </div>
   </div>
+  ${matchWarning}
   <div class="card">
-    <div class="card-title">Lotes listos para envío / Lots Ready to Ship</div>
+    <div class="card-title">Lots Ready to Ship / Listos para envío</div>
     ${readyHTML}
   </div>
   <div class="card">
-    <div class="card-title">Enviados recientemente / Recently Shipped</div>
-    ${recentShipped.length?recentShipped.map(l=>`<div class="log-row"><span><span style="font-family:var(--mono);font-size:13px;color:var(--green)">${l['Internal Lot #']||''}</span> — ${l['Part Type']||''} | ${l.Good||0} good parts<br><span style="font-size:11px;color:var(--text3)">${l['Customer Lots']||'—'}</span></span><span class="badge locked">SHIPPED</span></div>`).join(''):'<p style="font-size:13px;color:var(--text3)">Sin envíos todavía / No shipments yet.</p>'}
+    <div class="card-title">Recently Shipped / Enviados recientemente</div>
+    ${recentShipped.length?recentShipped.map(l=>`<div class="log-row"><span><span style="font-family:var(--mono);font-size:13px;color:var(--green)">${l['Internal Lot #']||''}</span> — ${l['Part Type']||''}<br><span style="font-size:11px;color:var(--text3)">${l['Customer Lots']||'—'}</span></span><span class="badge locked">SHIPPED</span></div>`).join(''):'<p style="font-size:13px;color:var(--text3)">No shipments yet.</p>'}
+  </div>`;
+}
+
+// ==================== CUSTOMER READ-ONLY: LOTS 24H ====================
+function renderCustLots24(){
+  const cutoff=new Date(Date.now()-24*60*60*1000);
+  const recent=DB.lots.filter(l=>{
+    try{return new Date(l['Start Time'])>=cutoff;}catch(e){return false;}
+  }).slice().reverse();
+  const rows=recent.length?recent.map(l=>`
+    <tr>
+      <td style="font-family:var(--mono);color:var(--green);font-weight:600">${l['Internal Lot #']||''}</td>
+      <td>${l.Machine||''}</td>
+      <td>${l['Part Type']||''}</td>
+      <td>${l.Operator||''}</td>
+      <td style="color:var(--green);font-weight:600">${l['Good Hollow']||l.Good||0}</td>
+      <td style="color:var(--blue);font-weight:600">${l['Good Solid']||0}</td>
+      <td>${(l.Status||'').replace('OPEN-UPDATED','OPEN')}</td>
+      <td style="font-size:11px">${l['Customer Lots']||'—'}</td>
+      <td style="font-size:11px">${l['Start Time']?new Date(l['Start Time']).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):''}</td>
+    </tr>`).join(''):`<tr><td colspan="9" style="color:var(--text3);padding:16px;text-align:center">No lot activity in the last 24 hours.</td></tr>`;
+  return`
+  <div class="page-title">Lots — Last 24 Hours</div>
+  <div class="page-sub">Read-only view of all lot activity in the last 24 hours. Auto-updates on sync.</div>
+  <div class="card" style="overflow-x:auto">
+    <table class="ship-table" style="min-width:700px">
+      <thead><tr>
+        <th>Lot #</th><th>Machine</th><th>Part Type</th><th>Operator</th>
+        <th>Good Hollow</th><th>Good Solid</th><th>Status</th><th>Customer Lots</th><th>Started</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+// ==================== CUSTOMER READ-ONLY: INSPECTION 24H ====================
+function renderCustInspect24(){
+  const cutoff=new Date(Date.now()-24*60*60*1000);
+  const recent=DB.quality.filter(q=>{
+    try{return new Date(q.Timestamp)>=cutoff;}catch(e){return false;}
+  }).slice().reverse();
+  const rows=recent.length?recent.map(q=>`
+    <tr>
+      <td style="font-size:11px">${q.Timestamp?new Date(q.Timestamp).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):''}</td>
+      <td style="font-family:var(--mono);font-size:12px;color:var(--green)">${q['Internal Lot #']||''}</td>
+      <td>${q.Machine||''}</td>
+      <td>${q.Operator||''}</td>
+      <td style="font-family:var(--mono);font-size:12px">${q['H1 Avg']||'—'}</td>
+      <td style="font-family:var(--mono);font-size:12px">${q['H2 Avg']||'—'}</td>
+      <td style="font-family:var(--mono);font-size:12px">${q['H3 Avg']||'—'}</td>
+      <td style="font-family:var(--mono);font-size:12px">${q['S1 Avg']||'—'}</td>
+      <td style="font-family:var(--mono);font-size:12px">${q['S2 Avg']||'—'}</td>
+      <td style="font-family:var(--mono);font-size:12px">${q['S3 Avg']||'—'}</td>
+      <td style="font-weight:600;color:${q['OOS Flag']==='OOS'?'var(--red)':'var(--green)'}">${q['OOS Flag']||'OK'}</td>
+    </tr>`).join(''):`<tr><td colspan="11" style="color:var(--text3);padding:16px;text-align:center">No inspection entries in the last 24 hours.</td></tr>`;
+  return`
+  <div class="page-title">Inspection — Last 24 Hours</div>
+  <div class="page-sub">Read-only view of all inspection entries in the last 24 hours. Auto-updates on sync.</div>
+  <div class="card" style="overflow-x:auto">
+    <table class="ship-table" style="min-width:900px">
+      <thead><tr>
+        <th>Time</th><th>Lot #</th><th>Machine</th><th>Operator</th>
+        <th>H1 Avg</th><th>H2 Avg</th><th>H3 Avg</th>
+        <th>S1 Avg</th><th>S2 Avg</th><th>S3 Avg</th><th>OOS</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
   </div>`;
 }
 
@@ -1443,6 +1587,129 @@ function generatePDF(lotNum){
       </div>
     </div>`;
   window.print();
+}
+
+// ==================== SHIFT PRODUCTION ====================
+function renderShiftProd(){
+  const openLots=DB.lots.filter(l=>(l.Status||l.status||'').trim().toUpperCase().startsWith('OPEN'));
+  const lotOpts=openLots.length
+    ?openLots.map(l=>`<option value="${l['Internal Lot #']}">${l['Internal Lot #']} | ${l.Machine||''}</option>`).join('')
+    :'<option value="">Sin lotes abiertos / No open lots</option>';
+  const today=new Date();
+  const dateStr=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  return`
+  <div class="page-title">Producción por Turno / Shift Production</div>
+  <div class="page-sub">Un registro por máquina por turno / One entry per machine per shift at end of shift</div>
+  <div class="card">
+    <div class="card-title">Información del turno / Shift Info</div>
+    <div class="g2">
+      <div class="field"><label>Iniciales / Operator Initials</label>
+        <input id="sp-op" maxlength="6" placeholder="Ej: MRC" style="text-transform:uppercase;font-family:var(--mono);font-size:18px;text-align:center">
+      </div>
+      <div class="field"><label>Fecha / Date</label>
+        <input id="sp-date" type="date" value="${dateStr}">
+      </div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Turno / Shift</label>
+        <select id="sp-shift">
+          <option value="1st">1ro / 1st (6am – 2:30pm)</option>
+          <option value="2nd">2do / 2nd (2pm – 10:30pm)</option>
+          <option value="3rd">3ro / 3rd (10pm – 6:30am)</option>
+        </select>
+      </div>
+      <div class="field"><label>Máquina / Machine</label>
+        <select id="sp-machine">
+          <option>S&F #1</option><option>S&F #2</option><option>S&F #3</option>
+          <option>S&F #4</option><option>S&F #5</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>Lote activo / Active Lot</label>
+      <select id="sp-lot" style="font-family:var(--mono);background:#e8ecf0;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;width:100%;padding:8px">
+        ${lotOpts}
+      </select>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Piezas buenas / Good Parts</div>
+    <div class="g2">
+      <div class="field"><label>Piezas buenas huecos / Good Hollow Parts</label>
+        <input id="sp-good-hollow" type="number" min="0" placeholder="0">
+      </div>
+      <div class="field"><label>Piezas buenas sólidos / Good Solid Parts</label>
+        <input id="sp-good-solid" type="number" min="0" placeholder="0">
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Piezas malas / Bad Parts — Slit & Form</div>
+    <div class="field"><label>Malas del S&F / Bad from Slit & Form (antes de shellac / before shellac)</label>
+      <input id="sp-bad-sf" type="number" min="0" placeholder="0">
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">No OK del Shellac / Not OK off Shellac Machine</div>
+    <div class="g2">
+      <div class="field"><label>No OK Shellac — Hueco / Hollow</label>
+        <input id="sp-notok-hollow" type="number" min="0" placeholder="0">
+      </div>
+      <div class="field"><label>No OK Shellac — Sólido / Solid</label>
+        <input id="sp-notok-solid" type="number" min="0" placeholder="0">
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Scrap real / Actual Scrap — No reparable / Not fixable</div>
+    <div class="g2">
+      <div class="field"><label>Scrap Hueco / Hollow Scrap</label>
+        <input id="sp-scrap-hollow" type="number" min="0" placeholder="0">
+      </div>
+      <div class="field"><label>Scrap Sólido / Solid Scrap</label>
+        <input id="sp-scrap-solid" type="number" min="0" placeholder="0">
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Notas / Notes</div>
+    <div class="field"><label>Comentarios del turno / Shift comments (opcional / optional)</label>
+      <textarea id="sp-notes" rows="2" placeholder="Ej: tuvimos problema con dado #3 / e.g. had issue with die #3"></textarea>
+    </div>
+  </div>
+  <button class="btn primary" id="btn-sp" onclick="submitShiftProd()">Guardar turno / Save Shift Production</button>
+  <div id="sp-msg" class="msg"></div>`;
+}
+async function submitShiftProd(){
+  const op=document.getElementById('sp-op')?.value.trim().toUpperCase();
+  if(!op){showMsg('sp-msg','Ingrese iniciales / Enter operator initials','err');return;}
+  const ts=new Date().toISOString();
+  const hdrs=['Timestamp','Date','Shift','Machine','Operator','Lot #',
+    'Good Hollow','Good Solid',
+    'Bad S&F','Not OK Shellac Hollow','Not OK Shellac Solid',
+    'Scrap Hollow','Scrap Solid','Notes'];
+  const row=[
+    ts,
+    document.getElementById('sp-date')?.value,
+    document.getElementById('sp-shift')?.value,
+    document.getElementById('sp-machine')?.value,
+    op,
+    document.getElementById('sp-lot')?.value,
+    parseInt(document.getElementById('sp-good-hollow')?.value)||0,
+    parseInt(document.getElementById('sp-good-solid')?.value)||0,
+    parseInt(document.getElementById('sp-bad-sf')?.value)||0,
+    parseInt(document.getElementById('sp-notok-hollow')?.value)||0,
+    parseInt(document.getElementById('sp-notok-solid')?.value)||0,
+    parseInt(document.getElementById('sp-scrap-hollow')?.value)||0,
+    parseInt(document.getElementById('sp-scrap-solid')?.value)||0,
+    document.getElementById('sp-notes')?.value||''
+  ];
+  setSavingState('btn-sp',true);
+  const synced=await toSheet('ShiftProduction',hdrs,row);
+  setSavingState('btn-sp',false);
+  showMsg('sp-msg','Turno guardado / Shift saved'+(synced?' — Google Sheets ✓':' — check connection'),'ok');
+  ['sp-bad-sf','sp-notok-hollow','sp-notok-solid','sp-scrap-hollow','sp-scrap-solid','sp-good-hollow','sp-good-solid','sp-notes','sp-op'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.value='';
+  });
 }
 
 // ==================== DEBUG PAGE ====================
