@@ -58,9 +58,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .card-title{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:14px;font-family:var(--mono)}
 .field{margin-bottom:12px}
 .field label{display:block;font-size:12px;color:var(--text2);margin-bottom:5px}
-.field input,.field select,.field textarea{width:100%;font-size:13px;padding:8px 10px;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:7px;font-family:var(--sans)}
-.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--blue)}
-.field select option{background:var(--bg3)}
+.field input,.field textarea{width:100%;font-size:13px;padding:8px 10px;background:#ffffff;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;font-family:var(--sans)}
+.field select{width:100%;font-size:13px;padding:8px 10px;background:#e8ecf0;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;font-family:var(--sans)}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 2px rgba(59,130,246,0.15)}
+.field select option{background:#e8ecf0;color:#1a4fa0}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
@@ -90,8 +91,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .btn.danger{background:var(--red-bg);border-color:var(--red-border);color:var(--red)}
 .btn.amber{background:var(--amber-bg);border-color:#78350f;color:var(--amber)}
 .btn.sm{width:auto;padding:6px 14px;font-size:12px;margin:0}
-.scan-input{width:100%;font-family:var(--mono);font-size:20px;padding:14px;text-align:center;background:var(--bg3);color:var(--green);border:2px solid var(--border2);border-radius:8px;letter-spacing:0.06em}
-.scan-input:focus{outline:none;border-color:var(--green)}
+.btn.saving{background:#7f1d1d!important;border-color:#ef4444!important;color:#fca5a5!important;cursor:not-allowed}
+.btn.saved{background:var(--green-bg)!important;border-color:var(--green-border)!important;color:var(--green)!important}
+.scan-input{width:100%;font-family:var(--mono);font-size:20px;padding:14px;text-align:center;background:#ffffff;color:#1a4fa0;border:2px solid var(--border2);border-radius:8px;letter-spacing:0.06em}
+.scan-input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 2px rgba(59,130,246,0.15)}
 .subtabs{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap}
 .subtabs button{font-size:12px;font-weight:500;padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-family:var(--sans)}
 .subtabs button.active{background:var(--bg3);color:var(--text);border-color:var(--border2)}
@@ -178,13 +181,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
     <div class="login-title">Honeywell Production</div>
     <div class="login-sub">Automation Systems | QF-001 Rev 1</div>
     <div class="role-btns">
-      <button class="role-btn" onclick="loginOperator()">Operator / Supervisor / Maintenance<br><span style="font-size:11px;color:var(--text3);font-weight:400">Full access — no password required</span></button>
-      <button class="role-btn customer" onclick="showCustomerPW()">Customer — Read Only Access</button>
+      <button class="role-btn" onclick="loginOperator()">Operator / Supervisor / Maintenance<br><span style="font-size:11px;color:var(--text3);font-weight:400">Operador / Supervisor / Mantenimiento — Acceso completo / Full access</span></button>
+      <button class="role-btn customer" onclick="showCustomerPW()">Customer — Read Only / Cliente — Solo lectura</button>
     </div>
     <div class="customer-pw" id="customer-pw">
-      <input type="password" id="pw-input" placeholder="Enter password" onkeydown="if(event.key==='Enter')checkPW()">
-      <button class="pw-btn" onclick="checkPW()">Access Customer View</button>
-      <div class="pw-err" id="pw-err">Incorrect password. Please try again.</div>
+      <input type="password" id="pw-input" placeholder="Contraseña / Password" onkeydown="if(event.key==='Enter')checkPW()">
+      <button class="pw-btn" onclick="checkPW()">Acceder / Access Customer View</button>
+      <div class="pw-err" id="pw-err">Contraseña incorrecta / Incorrect password.</div>
     </div>
   </div>
 </div>
@@ -279,10 +282,11 @@ function buildNav(){
   if(currentRole==='operator'){
     nav.innerHTML=`
       <button class="active" onclick="showPage('dashboard',this)">Dashboard</button>
+      <button onclick="showPage('receive',this)">Receiving / Shipping</button>
       <button onclick="showPage('lots',this)">Lot Control</button>
       <button onclick="showPage('inspect',this)">Inspection</button>
       <button onclick="showPage('downtime',this)">Downtime</button>
-      <button onclick="showPage('receive',this)">Receiving / Shipping</button>
+      <button onclick="showPage('debug',this)" style="color:var(--amber)">Debug</button>
       <button onclick="showPage('query',this)">Query & Export</button>`;
   }else{
     nav.innerHTML=`
@@ -457,6 +461,7 @@ function renderPage(p){
     case 'downtime': mc.innerHTML=renderDowntime();break;
     case 'receive': mc.innerHTML=renderReceive();break;
     case 'query': mc.innerHTML=renderQuery();break;
+    case 'debug': mc.innerHTML=renderDebug();break;
     case 'cust-dashboard': mc.innerHTML=renderCustDashboard();break;
     case 'cust-query': mc.innerHTML=renderCustQuery();break;
   }
@@ -565,7 +570,7 @@ function renderLots(){
         <div class="field"><label>Scrap</label><input id="nl-scrap" type="number" min="0" placeholder="0"></div>
       </div>
     </div>
-    <button class="btn success" onclick="startLot()">Start Lot — Begin Production</button>
+    <button class="btn success" id="btn-startlot" onclick="startLot()">Iniciar / Start Lot</button>
     <div id="nl-msg" class="msg"></div>
   </div>
 
@@ -767,35 +772,35 @@ function renderInspect(){
     ?openLots.map(l=>`<option value="${l['Internal Lot #']}" ${l['Internal Lot #']===defaultLot?'selected':''}>${l['Internal Lot #']} | ${l.Machine||''} | ${l['Part Type']||''}</option>`).join('')
     :'<option value="">No open lots — go to Lot Control first</option>';
   return`
-  <div class="page-title">30-Min Inspection Entry</div>
-  <div class="page-sub">Select the lot you are currently checking</div>
+  <div class="page-title">Inspección / 30-Min Inspection</div>
+  <div class="page-sub">Seleccione el lote que está revisando / Select the lot you are currently checking</div>
   <div class="legend">
-    <span style="font-size:11px;color:var(--text3);font-family:var(--mono)">AVERAGE:</span>
-    <div class="leg-item"><div class="leg-dot" style="background:var(--green-bg);border:1px solid var(--green-border)"></div><span style="color:var(--green)">In Spec</span></div>
-    <div class="leg-item"><div class="leg-dot" style="background:var(--red-bg);border:1px solid var(--red-border)"></div><span style="color:var(--red)">Over USL</span></div>
-    <div class="leg-item"><div class="leg-dot" style="background:var(--blue-bg);border:1px solid var(--blue-border)"></div><span style="color:var(--blue)">Under LSL</span></div>
+    <span style="font-size:11px;color:var(--text3);font-family:var(--mono)">PROMEDIO / AVERAGE:</span>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--green-bg);border:1px solid var(--green-border)"></div><span style="color:var(--green)">En spec / In Spec</span></div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--red-bg);border:1px solid var(--red-border)"></div><span style="color:var(--red)">Sobre USL / Over USL</span></div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--blue-bg);border:1px solid var(--blue-border)"></div><span style="color:var(--blue)">Bajo LSL / Under LSL</span></div>
   </div>
   <div class="completion-bar">
-    <span class="cb-label">This entry:</span>
+    <span class="cb-label">Esta entrada / This entry:</span>
     <span class="cb-item pending" id="cb-hollow">Hollow Dims</span>
     <span class="cb-item pending" id="cb-solid">Solid Dims</span>
-    <span style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-left:auto">Mark N/A if intentionally skipped</span>
+    <span style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-left:auto">Marcar N/A si se omite intencionalmente / Mark N/A if skipped</span>
   </div>
   <div class="subtabs">
-    <button class="active" onclick="setIT('hollow',this)">Hollow Dims</button>
-    <button onclick="setIT('solid',this)">Solid Dims</button>
+    <button class="active" onclick="setIT('hollow',this)">Hueco / Hollow Dims</button>
+    <button onclick="setIT('solid',this)">Sólido / Solid Dims</button>
   </div>
   <div class="card">
     <div class="g2">
-      <div class="field"><label>Operator Initials</label>
-        <input id="in-op" maxlength="6" placeholder="MRC" style="text-transform:uppercase;font-family:var(--mono);font-size:18px;text-align:center">
+      <div class="field"><label>Iniciales / Operator Initials</label>
+        <input id="in-op" maxlength="6" placeholder="Ej: MRC" style="text-transform:uppercase;font-family:var(--mono);font-size:18px;text-align:center">
       </div>
-      <div class="field"><label>Time</label>
+      <div class="field"><label>Hora / Time</label>
         <input id="in-time" readonly style="font-family:var(--mono);background:var(--bg3);color:var(--text2);font-size:14px" value="${new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}">
       </div>
     </div>
-    <div class="field"><label style="font-size:13px;font-weight:600;color:var(--text)">Select Lot for This Entry</label>
-      <select id="in-lot-select" onchange="onLotSelectChange()" style="font-family:var(--mono);font-size:14px;padding:10px;color:var(--green)">${lotOpts}</select>
+    <div class="field"><label style="font-size:13px;font-weight:600;color:var(--text)">Seleccione lote / Select Lot for This Entry</label>
+      <select id="in-lot-select" onchange="onLotSelectChange()" style="font-family:var(--mono);font-size:14px;padding:10px;background:#e8ecf0;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;width:100%">${lotOpts}</select>
     </div>
     <div id="in-machine-display" style="font-size:12px;color:var(--text3);font-family:var(--mono);margin-top:4px;padding:4px 2px"></div>
   </div>
@@ -857,8 +862,8 @@ function renderInspect(){
     </div>
   </div>
 
-  <button class="btn primary" onclick="submitInsp()">Save 30-Min Entry</button>
-  <button class="btn force" onclick="forceSyncInsp()">Force Sync to Google Sheets</button>
+  <button class="btn primary" id="btn-insp" onclick="submitInsp()">Guardar / Save 30-Min Entry</button>
+  <button class="btn force" onclick="forceSyncInsp()">Forzar sincronización / Force Sync</button>
   <div id="in-msg" class="msg"></div>`;
 }
 function attachInspectEvents(){
@@ -1025,9 +1030,11 @@ async function submitInsp(){
     sc.hVoids,sc.hExcess,sc.hOffcenter,sc.sVoids,sc.sExcess,sc.sOffcenter,sc.notes,
     oos?'OOS':'OK',naState.hollow?'N/A':'',naState.solid?'N/A':''];
   lastInspRow={hdrs,row};
+  setSavingState('btn-insp',true);
   const synced=await toSheet('QualityEntries',hdrs,row);
   await fetchAllData();
-  showMsg('in-msg','Entry saved'+(synced?' — synced to Google Sheets':' — check connection'),'ok');
+  setSavingState('btn-insp',false);
+  showMsg('in-msg','Entrada guardada / Entry saved'+(synced?' — Google Sheets ✓':' — check connection'),'ok');
   naState={hollow:false,solid:false};
   // Note: shellacNA is NOT reset here — it persists per lot until explicitly cleared
   PF={};
@@ -1060,30 +1067,52 @@ function renderDowntime(){
   const defaultLot=activeLot?activeLot.lotNum:(openLots.length?openLots[openLots.length-1]['Internal Lot #']:'');
   const lotOpts=openLots.length
     ?openLots.map(l=>`<option value="${l['Internal Lot #']}" ${l['Internal Lot #']===defaultLot?'selected':''}>${l['Internal Lot #']} | ${l.Machine||''}</option>`).join('')
-    :'<option value="">No open lots</option>';
+    :'<option value="">No open lots / Sin lotes abiertos</option>';
   return`
-  <div class="page-title">Downtime / Maintenance</div>
-  <div class="page-sub">Log all unplanned and planned downtime events</div>
+  <div class="page-title">Downtime / Mantenimiento</div>
+  <div class="page-sub">Log all unplanned and planned downtime events / Registre todos los eventos de tiempo no productivo</div>
   <div class="card">
-    <div class="field"><label style="font-size:13px;font-weight:600;color:var(--text)">Select Lot for This Entry</label>
-      <select id="dt-lot-select" style="font-family:var(--mono);font-size:14px;padding:10px;color:var(--green)">${lotOpts}</select>
+    <div class="field"><label style="font-size:13px;font-weight:600;color:var(--text)">Select Lot / Seleccione Lote</label>
+      <select id="dt-lot-select" style="font-family:var(--mono);font-size:14px;padding:10px;background:#e8ecf0;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;width:100%">${lotOpts}</select>
     </div>
   </div>
+  <div class="card">
     <div class="g2">
-      <div class="field"><label>Operator / Tech</label><input id="dt-op" maxlength="6" placeholder="initials" style="text-transform:uppercase;font-family:var(--mono)"></div>
-      <div class="field"><label>Machine</label><select id="dt-mach"><option>S&F #1</option><option>S&F #2</option><option>S&F #3</option><option>S&F #4</option><option>S&F #5</option><option>Shellac Inline #1</option><option>Shellac Inline #2</option><option>Shellac Inline #3</option></select></div>
-      <div class="field"><label>Start Time</label><input id="dt-start" type="time"></div>
-      <div class="field"><label>End Time</label><input id="dt-end" type="time"></div>
+      <div class="field"><label>Operator / Tech<br><span style="font-size:11px;color:var(--text3)">Operador / Técnico</span></label><input id="dt-op" maxlength="6" placeholder="Iniciales / Initials" style="text-transform:uppercase;font-family:var(--mono)"></div>
+      <div class="field"><label>Machine / Máquina</label><select id="dt-mach"><option>S&F #1</option><option>S&F #2</option><option>S&F #3</option><option>S&F #4</option><option>S&F #5</option><option>Shellac Inline #1</option><option>Shellac Inline #2</option><option>Shellac Inline #3</option></select></div>
+      <div class="field"><label>Start Time / Hora inicio</label><input id="dt-start" type="time"></div>
+      <div class="field"><label>End Time / Hora fin</label><input id="dt-end" type="time"></div>
     </div>
-    <div class="field"><label>Type</label><select id="dt-type"><option>Unplanned Breakdown</option><option>Planned Maintenance</option><option>Tooling Change</option><option>Die Change</option><option>Material Shortage</option><option>Quality Hold</option><option>Other</option></select></div>
-    <div class="field"><label>Root Cause / Description</label><textarea id="dt-desc" rows="3" placeholder="Describe the issue..."></textarea></div>
+    <div class="field"><label>Type / Tipo</label>
+      <select id="dt-type">
+        <option>Unplanned Breakdown / Falla no planeada</option>
+        <option>Planned Maintenance / Mantenimiento planeado</option>
+        <option>Tooling Change / Cambio de herramienta</option>
+        <option>Die Change / Cambio de dado</option>
+        <option>Material Shortage / Falta de material</option>
+        <option>Quality Hold / Paro por calidad</option>
+        <option>Other / Otro</option>
+      </select>
+    </div>
+    <div class="field"><label>Root Cause / Causa raíz<br><span style="font-size:11px;color:var(--text3)">Describe the issue / Describa el problema</span></label>
+      <textarea id="dt-desc" rows="3" placeholder="Describe the issue... / Describa el problema..."></textarea>
+    </div>
     <div class="g2">
-      <div class="field"><label>Parts Lost</label><input id="dt-lost" type="number" min="0" placeholder="0"></div>
-      <div class="field"><label>Corrective Action</label><input id="dt-action" placeholder="e.g. Replaced die"></div>
+      <div class="field"><label>Parts Lost / Piezas perdidas</label><input id="dt-lost" type="number" min="0" placeholder="0"></div>
+      <div class="field"><label>Corrective Action / Acción correctiva</label>
+        <select id="dt-action">
+          <option value="N/A">N/A — No action needed / Sin acción necesaria</option>
+          <option value="Called Setup to fix">Called Setup to fix / Llamó a Setup para reparar</option>
+          <option value="Operator fixed">Operator fixed / Operador reparó</option>
+          <option value="Waiting for parts">Waiting for parts / Esperando refacciones</option>
+          <option value="Maintenance completed">Maintenance completed / Mantenimiento completado</option>
+          <option value="Other">Other / Otro</option>
+        </select>
+      </div>
     </div>
   </div>
-  <button class="btn primary" onclick="submitDT()">Save Downtime Record</button>
-  <button class="btn force" onclick="forceSyncDT()">Force Sync to Google Sheets</button>
+  <button class="btn primary" id="btn-dt" onclick="submitDT()">Guardar / Save Downtime Record</button>
+  <button class="btn force" onclick="forceSyncDT()">Force Sync / Forzar sincronización</button>
   <div id="dt-msg" class="msg"></div>`;
 }
 async function submitDT(){
@@ -1096,10 +1125,13 @@ async function submitDT(){
   const hdrs=['Timestamp','Internal Lot #','Machine','Operator','Type','Start','End','Duration (min)','Description','Parts Lost','Corrective Action'];
   const row=[ts,lot,document.getElementById('dt-mach')?.value,op,document.getElementById('dt-type')?.value,start,end,mins,document.getElementById('dt-desc')?.value,parseInt(document.getElementById('dt-lost')?.value)||0,document.getElementById('dt-action')?.value];
   lastDTRow={hdrs,row};
+  setSavingState('btn-dt',true);
   const synced=await toSheet('Downtime',hdrs,row);
   await fetchAllData();
-  showMsg('dt-msg','Downtime saved'+(synced?' — synced':' — check connection'),'ok');
-  ['dt-op','dt-start','dt-end','dt-desc','dt-lost','dt-action'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  setSavingState('btn-dt',false);
+  showMsg('dt-msg','Guardado / Downtime saved'+(synced?' — Google Sheets ✓':' — check connection'),'ok');
+  ['dt-op','dt-start','dt-end','dt-desc','dt-lost'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const ca=document.getElementById('dt-action');if(ca)ca.value='N/A';
 }
 async function forceSyncDT(){
   if(!lastDTRow){showMsg('dt-msg','Save an entry first','err');return;}
@@ -1113,49 +1145,49 @@ function renderReceive(){
   const openLotOpts=openLots.map(l=>`<option value="${l['Internal Lot #']}">${l['Internal Lot #']} | ${l.Machine} | ${l['Part Type']}</option>`).join('');
   return`
   <div class="page-title">Receiving & Shipping</div>
-  <div class="page-sub">Mobile-friendly — phone camera scans barcodes directly into scan fields</div>
+  <div class="page-sub">Mobile-friendly — Escanee con cámara del teléfono / phone camera scans barcodes</div>
   <div class="subtabs">
-    <button class="active" onclick="setRS('recv',this)">Incoming Material</button>
-    <button onclick="setRS('ship',this)">Outgoing Shipment</button>
+    <button class="active" onclick="setRS('recv',this)">Incoming / Entrada</button>
+    <button onclick="setRS('ship',this)">Outgoing / Salida</button>
   </div>
   <div id="rs-recv">
     <div class="card">
-      <div class="card-title">Receive Customer Cups</div>
-      <div class="field"><label style="font-size:14px;font-weight:600;color:var(--text)">Scan Customer Lot Barcode</label>
-        <input class="scan-input" id="rv-lot" placeholder="Scan or type lot #..." autocomplete="off">
+      <div class="card-title">Recibir / Receive Customer Cups</div>
+      <div class="field"><label style="font-size:14px;font-weight:600;color:var(--text)">Escanear lote del cliente / Scan Customer Lot Barcode</label>
+        <input class="scan-input" id="rv-lot" placeholder="Escanear o escribir # de lote / Scan or type lot #..." autocomplete="off">
       </div>
       <div class="g2">
-        <div class="field"><label>Bin #</label><input id="rv-bin" placeholder="e.g. 23" style="font-size:18px;padding:10px;font-family:var(--mono);text-align:center"></div>
-        <div class="field"><label>Qty Received</label><input id="rv-qty" type="number" placeholder="1500" style="font-size:18px;padding:10px;text-align:center"></div>
+        <div class="field"><label>Bin # / Caja #</label><input id="rv-bin" placeholder="ej. 23" style="font-size:18px;padding:10px;font-family:var(--mono);text-align:center;background:#fff;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;width:100%"></div>
+        <div class="field"><label>Qty Received / Cantidad recibida</label><input id="rv-qty" type="number" placeholder="1500" style="font-size:18px;padding:10px;text-align:center;background:#fff;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;width:100%"></div>
       </div>
       <div class="g2">
-        <div class="field"><label>Received By</label><input id="rv-op" maxlength="6" placeholder="initials" style="text-transform:uppercase;font-family:var(--mono)"></div>
-        <div class="field"><label>Condition</label><select id="rv-cond"><option>OK</option><option>Damaged Packaging</option><option>Short Count</option><option>Hold — Inspect First</option></select></div>
+        <div class="field"><label>Received By / Recibido por</label><input id="rv-op" maxlength="6" placeholder="Iniciales" style="text-transform:uppercase;font-family:var(--mono)"></div>
+        <div class="field"><label>Condition / Condición</label><select id="rv-cond"><option>OK</option><option>Damaged Packaging / Empaque dañado</option><option>Short Count / Cuenta corta</option><option>Hold — Inspect First / Retener — Inspeccionar primero</option></select></div>
       </div>
-      <div class="field"><label>Notes</label><input id="rv-notes" placeholder="Optional"></div>
+      <div class="field"><label>Notes / Notas</label><input id="rv-notes" placeholder="Opcional / Optional"></div>
     </div>
-    <button class="btn success" onclick="submitRecv()">Log Incoming Material</button>
+    <button class="btn success" id="btn-recv" onclick="submitRecv()">Guardar / Log Incoming Material</button>
     <div id="rv-msg" class="msg"></div>
   </div>
   <div id="rs-ship" style="display:none">
     <div class="card">
-      <div class="card-title">Ship Finished Parts</div>
-      <p style="font-size:12px;color:var(--text3);margin-bottom:12px">Only open lots shown. Shipping permanently locks the lot.</p>
-      <div class="field"><label style="font-size:14px;font-weight:600;color:var(--text)">Select Internal Lot to Ship</label>
-        <select id="sh-lot" onchange="showShipDetail()" style="font-family:var(--mono);font-size:15px;padding:12px"><option value="">— Select open lot —</option>${openLotOpts}</select>
+      <div class="card-title">Enviar partes / Ship Finished Parts</div>
+      <p style="font-size:12px;color:var(--text3);margin-bottom:12px">Solo lotes abiertos / Only open lots shown. Al enviar se cierra el lote / Shipping permanently locks the lot.</p>
+      <div class="field"><label style="font-size:14px;font-weight:600;color:var(--text)">Seleccione lote a enviar / Select Internal Lot to Ship</label>
+        <select id="sh-lot" onchange="showShipDetail()" style="font-family:var(--mono);font-size:15px;padding:12px;background:#e8ecf0;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;width:100%"><option value="">— Seleccione lote / Select open lot —</option>${openLotOpts}</select>
       </div>
       <div id="sh-detail" style="display:none"></div>
       <div class="g2">
-        <div class="field"><label>Part Type</label><select id="sh-type"><option>Hollow</option><option>Solid</option><option>Both</option></select></div>
-        <div class="field"><label>Qty Shipped</label><input id="sh-qty" type="number" placeholder="3000" style="font-size:18px;padding:10px;text-align:center"></div>
+        <div class="field"><label>Part Type / Tipo de parte</label><select id="sh-type"><option>Hollow / Hueco</option><option>Solid / Sólido</option><option>Both / Ambos</option></select></div>
+        <div class="field"><label>Qty Shipped / Cantidad enviada</label><input id="sh-qty" type="number" placeholder="3000" style="font-size:18px;padding:10px;text-align:center;background:#fff;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;width:100%"></div>
       </div>
       <div class="g2">
-        <div class="field"><label>Shipped By</label><input id="sh-op" maxlength="6" placeholder="initials" style="text-transform:uppercase;font-family:var(--mono)"></div>
-        <div class="field"><label>Customer PO / Ref</label><input id="sh-po" placeholder="Optional"></div>
+        <div class="field"><label>Shipped By / Enviado por</label><input id="sh-op" maxlength="6" placeholder="Iniciales" style="text-transform:uppercase;font-family:var(--mono)"></div>
+        <div class="field"><label>Customer PO / Orden de compra</label><input id="sh-po" placeholder="Opcional / Optional"></div>
       </div>
-      <div class="field"><label>Notes</label><input id="sh-notes" placeholder="Optional"></div>
+      <div class="field"><label>Notes / Notas</label><input id="sh-notes" placeholder="Opcional / Optional"></div>
     </div>
-    <button class="btn danger" onclick="submitShip()">Ship & Lock Lot</button>
+    <button class="btn danger" id="btn-ship" onclick="submitShip()">Enviar / Ship & Lock Lot</button>
     <div id="sh-msg" class="msg"></div>
   </div>`;
 }
@@ -1177,27 +1209,28 @@ function showShipDetail(){
 }
 async function submitRecv(){
   const lot=document.getElementById('rv-lot')?.value.trim();
-  if(!lot){showMsg('rv-msg','Scan or enter customer lot number','err');return;}
+  if(!lot){showMsg('rv-msg','Escanee el lote / Scan lot number','err');return;}
   const bin=document.getElementById('rv-bin')?.value.trim();
   const ts=new Date().toISOString();
   const hdrs=['Customer Lot #','Event','Date','Received Date','Bin #','Qty','Operator','Condition','Notes','Direction'];
   const row=[lot,'RECEIVED',ts,ts.slice(0,10),bin,document.getElementById('rv-qty')?.value,document.getElementById('rv-op')?.value,document.getElementById('rv-cond')?.value,document.getElementById('rv-notes')?.value,'RECEIVED'];
+  setSavingState('btn-recv',true);
   const synced=await toSheet('CustomerLots',hdrs,row);
-  // Also log to ReceivingShipping
   await toSheet('ReceivingShipping',['Timestamp','Customer Lot #','Bin #','Qty','Operator','Condition','Notes','Direction'],[ts,lot,bin,document.getElementById('rv-qty')?.value,document.getElementById('rv-op')?.value,document.getElementById('rv-cond')?.value,document.getElementById('rv-notes')?.value,'RECEIVED']);
   await fetchAllData();
-  showMsg('rv-msg','Incoming logged — '+lot+(bin?' bin '+bin:'')+' now available in Lot Control'+(synced?' — synced':' — check connection'),'ok');
+  setSavingState('btn-recv',false);
+  showMsg('rv-msg','Recibido / Logged — '+lot+(bin?' bin '+bin:'')+' disponible / available in Lot Control'+(synced?' — Google Sheets ✓':' — check connection'),'ok');
   ['rv-lot','rv-bin','rv-qty','rv-op','rv-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   setTimeout(()=>{const el=document.getElementById('rv-lot');if(el)el.focus();},100);
 }
 async function submitShip(){
   const lotNum=document.getElementById('sh-lot')?.value;
-  if(!lotNum){showMsg('sh-msg','Select an open lot','err');return;}
+  if(!lotNum){showMsg('sh-msg','Seleccione un lote / Select an open lot','err');return;}
   const op=document.getElementById('sh-op')?.value.trim().toUpperCase();
-  if(!op){showMsg('sh-msg','Enter shipped by initials','err');return;}
+  if(!op){showMsg('sh-msg','Ingrese iniciales / Enter initials','err');return;}
   const ts=new Date().toISOString();
-  // Write shipped status row to Lots sheet
   const lot=DB.lots.find(l=>l['Internal Lot #']===lotNum);
+  setSavingState('btn-ship',true);
   await toSheet('Lots',['Internal Lot #','Machine','Part Type','Date','Operator','Customer Lots','Start Time','Good','Bad','Scrap','Status'],[lotNum,lot?.Machine||'',lot?.['Part Type']||'',lot?.Date||'',lot?.Operator||'',lot?.['Customer Lots']||'',lot?.['Start Time']||'',lot?.Good||0,lot?.Bad||0,lot?.Scrap||0,'SHIPPED']);
   await toSheet('ReceivingShipping',['Timestamp','Internal Lot #','Part Type','Qty','Shipped By','Customer PO','Notes','Direction'],[ts,lotNum,document.getElementById('sh-type')?.value,document.getElementById('sh-qty')?.value,op,document.getElementById('sh-po')?.value,document.getElementById('sh-notes')?.value,'SHIPPED — LOCKED']);
   if(activeLot&&activeLot.lotNum===lotNum){
@@ -1206,7 +1239,8 @@ async function submitShip(){
     saveLocalCache();
   }
   await fetchAllData();
-  showMsg('sh-msg','Lot '+lotNum+' shipped and locked','ok');
+  setSavingState('btn-ship',false);
+  showMsg('sh-msg','Enviado / Lot '+lotNum+' shipped and locked — Google Sheets ✓','ok');
   ['sh-qty','sh-op','sh-po','sh-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
 }
 
@@ -1415,11 +1449,58 @@ function generatePDF(lotNum){
   window.print();
 }
 
+// ==================== DEBUG PAGE ====================
+function renderDebug(){
+  const openLots=DB.lots.filter(l=>(l.Status||l.status||'').trim().toUpperCase().startsWith('OPEN'));
+  return`
+  <div class="page-title" style="color:var(--amber)">Debug / Diagnóstico</div>
+  <div class="page-sub">Technical information for troubleshooting — not for operators</div>
+  <div class="card" style="border-color:#78350f;background:var(--amber-bg)">
+    <div class="card-title" style="color:var(--amber)">Google Sheets sync status</div>
+    <div style="font-family:var(--mono);font-size:12px;color:var(--text2);line-height:2">
+      <div>DB.lots count: <strong style="color:var(--text)">${DB.lots.length}</strong></div>
+      <div>Open lots: <strong style="color:var(--green)">${openLots.length}</strong></div>
+      <div>Lot statuses: <strong style="color:var(--text)">${DB.lots.map(l=>l['Internal Lot #']+'='+l.Status).join(', ')||'none'}</strong></div>
+      <div>Lot keys (first lot): <strong style="color:var(--amber)">${DB.lots.length?Object.keys(DB.lots[0]).join(' | '):'none'}</strong></div>
+      <div>DB.custLots: <strong style="color:var(--text)">${DB.custLots.length}</strong> — ${DB.custLots.map(c=>c.lotNum).join(', ')||'none'}</div>
+      <div>DB.quality rows: <strong style="color:var(--text)">${DB.quality.length}</strong></div>
+      <div>DB.downtime rows: <strong style="color:var(--text)">${DB.downtime.length}</strong></div>
+      <div>Active lot: <strong style="color:var(--green)">${activeLot?activeLot.lotNum:'none'}</strong></div>
+      <div>Apps Script URL: <strong style="color:var(--text);font-size:10px;word-break:break-all">${WEB_APP}</strong></div>
+    </div>
+    <button onclick="syncNow()" class="btn primary" style="margin-top:12px">Force sync now / Forzar sincronización</button>
+  </div>
+  <div class="card">
+    <div class="card-title">All lots in DB</div>
+    ${DB.lots.length?`<table style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
+      <thead><tr style="border-bottom:1px solid var(--border)"><th style="text-align:left;padding:4px;color:var(--text3)">Lot #</th><th style="text-align:left;padding:4px;color:var(--text3)">Machine</th><th style="text-align:left;padding:4px;color:var(--text3)">Status</th><th style="text-align:left;padding:4px;color:var(--text3)">Date</th></tr></thead>
+      <tbody>${DB.lots.map(l=>`<tr style="border-bottom:1px solid var(--border)"><td style="padding:4px;color:var(--green)">${l['Internal Lot #']||''}</td><td style="padding:4px;color:var(--text2)">${l.Machine||''}</td><td style="padding:4px;color:${(l.Status||'').includes('OPEN')?'var(--green)':'var(--text3)'}">${l.Status||'—'}</td><td style="padding:4px;color:var(--text2)">${l.Date||''}</td></tr>`).join('')}</tbody>
+    </table>`:'<p style="font-size:13px;color:var(--text3)">No lots loaded.</p>'}
+  </div>`;
+}
+
 // ==================== HELPERS ====================
 function showMsg(id,msg,type){
   const el=document.getElementById(id);if(!el)return;
   el.textContent=msg;el.className='msg '+type;
   setTimeout(()=>{if(el)el.className='msg';},5000);
+}
+function setSavingState(btnId,saving){
+  const btn=document.getElementById(btnId);if(!btn)return;
+  if(saving){
+    btn.dataset.origText=btn.textContent;
+    btn.dataset.origClass=btn.className;
+    btn.className=btn.className.replace(/primary|success/g,'').trim()+' saving';
+    btn.textContent='Guardando... / Saving...';
+    btn.disabled=true;
+  }else{
+    btn.className=(btn.dataset.origClass||btn.className.replace('saving','primary').trim());
+    btn.textContent=btn.dataset.origText||btn.textContent;
+    btn.disabled=false;
+    // Flash green briefly
+    btn.classList.add('saved');
+    setTimeout(()=>{btn.classList.remove('saved');},1500);
+  }
 }
 </script>
 </body>
