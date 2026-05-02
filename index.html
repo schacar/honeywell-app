@@ -542,9 +542,8 @@ function renderLots(){
       <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:12px;font-family:var(--mono)">Máquina / Machine — YYMMDD — Secuencia de caja / Bin sequence</div>
       <div class="field"><label>Tipo de parte / Part Type</label>
         <select id="nl-ptype">
-          <option value="both">Ambos / Both Hollow & Solid</option>
-          <option value="hollow">Solo hueco / Hollow only</option>
-          <option value="solid">Solo sólido / Solid only</option>
+          <option value="hollow">Hueco / Hollow</option>
+          <option value="solid">Sólido / Solid</option>
         </select>
       </div>
       <div class="field"><label>Iniciales del operador / Operator Initials</label>
@@ -633,6 +632,23 @@ function setLT(t,btn){
 function getCustOpts(){
   return DB.custLots.filter(c=>c.status==='open').map(c=>`<option value="${c.lotNum}">${c.lotNum} (${c.bins.length} bins)</option>`).join('');
 }
+function getBinOpts(lotNum){
+  const cl=DB.custLots.find(c=>c.lotNum===lotNum);
+  if(!cl||!cl.bins.length)return'<option value="">— No bins on file —</option>';
+  return'<option value="">— Select bin —</option>'+cl.bins.map(b=>`<option value="${b}">${b}</option>`).join('');
+}
+function updateBinDropdown(n){
+  const lotSel=document.getElementById('nl-cl-'+n);
+  const binSel=document.getElementById('nl-bin-'+n);
+  if(!lotSel||!binSel)return;
+  binSel.innerHTML=getBinOpts(lotSel.value);
+}
+function updateElBinDropdown(n){
+  const lotSel=document.getElementById('el-cl-'+n);
+  const binSel=document.getElementById('el-bin-'+n);
+  if(!lotSel||!binSel)return;
+  binSel.innerHTML=getBinOpts(lotSel.value);
+}
 function genLot(){
   const m=document.getElementById('nl-mach')?.value;
   const dv=document.getElementById('nl-date')?.value;
@@ -650,9 +666,10 @@ function genLot(){
 }
 function addNLCustLot(){
   nlClCount++;
+  const n=nlClCount;
   const c=document.getElementById('nl-cl-container');if(!c)return;
   const d=document.createElement('div');d.className='g2';d.style.marginBottom='10px';
-  d.innerHTML=`<div class="field" style="margin:0"><label>Lote cliente / Customer Lot</label><select id="nl-cl-${nlClCount}" style="font-family:var(--mono);background:#e8ecf0;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;width:100%;padding:8px"><option value="">— Seleccione / Select —</option>${getCustOpts()}</select></div><div class="field" style="margin:0"><label>Caja # / Bin #</label><input id="nl-bin-${nlClCount}" placeholder="ej. 23" style="font-size:16px;padding:10px;font-family:var(--mono);text-align:center;width:100%;background:#fff;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px"></div>`;
+  d.innerHTML=`<div class="field" style="margin:0"><label>Lote cliente / Customer Lot</label><select id="nl-cl-${n}" onchange="updateBinDropdown(${n})" style="font-family:var(--mono);background:#e8ecf0;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;width:100%;padding:8px"><option value="">— Seleccione / Select —</option>${getCustOpts()}</select></div><div class="field" style="margin:0"><label>Caja # / Bin #</label><select id="nl-bin-${n}" style="font-family:var(--mono);font-size:15px;background:#e8ecf0;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;width:100%;padding:8px"><option value="">— Select lot first —</option></select></div>`;
   c.appendChild(d);
 }
 async function startLot(){
@@ -700,7 +717,8 @@ function addELCustLot(){
   elClCount++;
   const c=document.getElementById('el-cl-container');if(!c)return;
   const d=document.createElement('div');d.className='g2';d.style.marginBottom='10px';
-  d.innerHTML=`<div class="field" style="margin:0"><label>Lote cliente / Customer Lot</label><select id="el-cl-${elClCount}" style="font-family:var(--mono);background:#e8ecf0;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;width:100%;padding:8px"><option value="">— Seleccione / Select —</option>${getCustOpts()}</select></div><div class="field" style="margin:0"><label>Caja # / Bin #</label><input id="el-bin-${elClCount}" placeholder="ej. 23" style="font-size:16px;padding:10px;font-family:var(--mono);text-align:center;width:100%;background:#fff;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px"></div>`;
+  const en=elClCount;
+  d.innerHTML=`<div class="field" style="margin:0"><label>Lote cliente / Customer Lot</label><select id="el-cl-${en}" onchange="updateElBinDropdown(${en})" style="font-family:var(--mono);background:#e8ecf0;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;width:100%;padding:8px"><option value="">— Seleccione / Select —</option>${getCustOpts()}</select></div><div class="field" style="margin:0"><label>Caja # / Bin #</label><select id="el-bin-${en}" style="font-family:var(--mono);font-size:15px;background:#e8ecf0;color:#1a4fa0;border:1px solid var(--border2);border-radius:7px;width:100%;padding:8px"><option value="">— Select lot first —</option></select></div>`;
   c.appendChild(d);
 }
 function setActiveLot(){
