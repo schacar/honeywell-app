@@ -643,9 +643,10 @@ function genLot(){
   const yy=String(dt.getFullYear()).slice(2);
   const mm=String(dt.getMonth()+1).padStart(2,'0');
   const dd=String(dt.getDate()).padStart(2,'0');
-  const todayLots=DB.lots.filter(l=>l['Machine']&&l['Machine'].includes('#'+parseInt(m))&&l['Date']===dv);
+  const prefix=`${m}-${yy}${mm}${dd}-`;
+  const todayLots=DB.lots.filter(l=>l['Internal Lot #']&&l['Internal Lot #'].startsWith(prefix));
   const bin=String(todayLots.length+1).padStart(2,'0');
-  el.textContent=`${m}-${yy}${mm}${dd}-${bin}`;
+  el.textContent=`${prefix}${bin}`;
 }
 function addNLCustLot(){
   nlClCount++;
